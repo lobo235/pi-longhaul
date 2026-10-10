@@ -12,6 +12,7 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -24,5 +25,8 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:
+      # Minor and patch updates together; a major version (TypeScript 7, say) comes as its own pull request, since
+      # it can break the typecheck and needs a decision rather than a merge.
       dev-tooling:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
