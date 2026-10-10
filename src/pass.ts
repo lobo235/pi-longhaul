@@ -4,6 +4,7 @@
  * checkpoint. Pure with respect to pi: everything it needs arrives in PassInput/PassDeps, and the
  * span record is returned as `pending` for index.ts to append once the compaction entry exists.
  */
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import type { CompactionResult, SessionBeforeCompactEvent, SessionEntry } from "@earendil-works/pi-coding-agent";
 
@@ -19,6 +20,7 @@ import { NARRATIVE_PROMPT_REVISION, promptStateOf, seedOf, type PromptState } fr
 import { shouldAttemptRoute, type RouteHealthState } from "./narrative/route-health.ts";
 import { resolveSummarizationModel, type ModelLookup, type ResolvedSummarizationModel } from "./narrative/routing.ts";
 import { routeProvidersFor, type ResolvedSummarizationRoute } from "./narrative/route-config.ts";
+import { turnTextsOf, type SpanTexts } from "./narrative/named-values.ts";
 import { runNarrativeCall, type NarrativeInput } from "./narrative/run.ts";
 import { TURNS_PROMPT_REVISION } from "./narrative/turns/conversation.ts";
 import { runSectionTurns, type TurnsContext } from "./narrative/turns/run.ts";
@@ -241,8 +243,22 @@ function seedRuleEvents(fold: Fold, outcome: NarrativeOutcome, diffEvents: State
   return applyProposals(proposals, { resolver: fold.index, state: after, provenance: { source: "pass", span: fold.span, at }, caps: config.caps, nearDuplicateThreshold: config.nearDuplicateThreshold, acceptedThisSpan: 0, rememberCap: 0 }).events;
 }
 
+/**
+ * A switchover's turns before the span, each opened by its user message's ordinal: the previous summary is another
+ * compactor's, so a value it records can be kept only where one of these shows it (named-values.ts withEarlierTurns).
+ */
+function earlierTurnsOf(branchEntries: SessionEntry[], index: MessageIndex, fromRef: string): SpanTexts | undefined {
+  const end = index.messages.find((message) => message.ordinal === fromRef)?.position;
+  if (end === undefined) return undefined;
+  const ordinalAt = new Map(index.messages.map((message) => [message.position, message.ordinal]));
+  const turns = branchEntries.slice(0, end).flatMap((entry, position) => (entry.type === "message" ? [{ message: entry.message as AgentMessage, ordinal: ordinalAt.get(position) }] : []));
+  return turnTextsOf(turns);
+}
+
 function narrativeInputOf(input: PassInput, fold: Fold, config: StateConfig, deps: PassDeps, at: string, state: SessionState): NarrativeInput {
+  const earlierTurns = fold.seed.seed ? earlierTurnsOf(input.branchEntries, fold.index, fold.spanInput.fromRef) : undefined;
   return {
+    ...(earlierTurns ? { earlierTurns } : {}),
     span: fold.spanInput,
     state,
     promptState: { ...promptStateOf(state, acceptedRemembers(fold.log, fold.span)), ...fold.seed },

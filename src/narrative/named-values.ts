@@ -85,6 +85,8 @@ const isTainted = (value: string, tainted: ReadonlySet<string>) => [...tainted].
 export interface SpanTexts {
   turnTextOf: (ordinal: string) => string | undefined;
   tainted: ReadonlySet<string>;
+  /** On a switchover, the newest earlier turn whose text shows `value` (withEarlierTurns): a wrong pointer to a real value. */
+  holderOf?: (value: string) => string | undefined;
 }
 
 /**
@@ -93,19 +95,37 @@ export interface SpanTexts {
  * more a value than one the user typed.
  */
 export function spanTextsOf(messages: AgentMessage[]): SpanTexts {
+  return turnTextsOf((messages as unknown as Rec[]).map((message) => {
+    const tag = message.role === "user" ? /^\[(u\d+)\] /.exec(textsIn(message)[0] ?? "")?.[1] : undefined;
+    return { message: message as unknown as AgentMessage, ...(tag ? { ordinal: tag } : {}) };
+  }));
+}
+
+/** Each turn's text and the credential tokens of `messages`, where a user message that opens a turn carries its ordinal. */
+export function turnTextsOf(messages: ReadonlyArray<{ ordinal?: string; message: AgentMessage }>): SpanTexts {
   const turns = new Map<string, string[]>();
   const tainted = new Set<string>();
   let current: string[] | undefined;
-  for (const message of messages as unknown as Rec[]) {
+  for (const { ordinal, message } of messages as unknown as ReadonlyArray<{ ordinal?: string; message: Rec }>) {
     for (const text of everyTextIn(message)) for (const token of credentialTokensOf(text)) tainted.add(token);
-    const texts = textsIn(message);
-    const tag = message.role === "user" ? /^\[(u\d+)\] /.exec(texts[0] ?? "")?.[1] : undefined;
-    if (tag) turns.set(tag, (current = []));
-    current?.push(...texts);
+    if (ordinal) turns.set(ordinal, (current = []));
+    current?.push(...textsIn(message));
   }
-  for (const output of secretStoreOutputs(messages as unknown as Rec[])) for (const token of tokensOf(output)) tainted.add(token);
+  for (const output of secretStoreOutputs(messages.map((entry) => entry.message) as unknown as Rec[])) for (const token of tokensOf(output)) tainted.add(token);
   const joined = new Map([...turns].map(([ordinal, texts]) => [ordinal, texts.join("\n")]));
-  return { turnTextOf: (ordinal) => joined.get(ordinal), tainted };
+  const newestFirst = [...joined].reverse();
+  const holderOf = (value: string) => newestFirst.find(([, text]) => flat(splitCredentialLines(text).clean.join("\n")).includes(flat(value)))?.[0];
+  return { turnTextOf: (ordinal) => joined.get(ordinal), tainted, holderOf };
+}
+
+/**
+ * The span's turns, then on a switchover the turns before it (pass.ts earlierTurnsOf): the previous summary came from
+ * another compactor, so the values it records were never carried as Learned values. The summary only points at one;
+ * a value is kept only where an earlier turn shows it verbatim, and every credential token of either taints both.
+ */
+export function withEarlierTurns(span: SpanTexts, earlier: SpanTexts | undefined): SpanTexts {
+  if (!earlier) return span;
+  return { turnTextOf: (ordinal) => span.turnTextOf(ordinal) ?? earlier.turnTextOf(ordinal), tainted: new Set([...span.tainted, ...earlier.tainted]), ...(earlier.holderOf ? { holderOf: earlier.holderOf } : {}) };
 }
 
 type Verdict = { ok: true; value: LearnedValue } | { ok: false; error: Omit<FieldError, "path"> };
@@ -113,6 +133,14 @@ type Verdict = { ok: true; value: LearnedValue } | { ok: false; error: Omit<Fiel
 const rejected = (ref: string, reason: "credential" | "random" | "shape" | "name"): Verdict => ({ ok: false, error: { rejection: { code: "value-rejected", ref, reason }, fixable: false } });
 
 function checkOne(answer: NamedValueAnswer, span: SpanTexts): Verdict {
+  const verdict = checkAt(answer, span);
+  if (verdict.ok || !span.holderOf || (verdict.error.rejection.code !== "value-not-in-turn" && verdict.error.rejection.code !== "unknown-ref")) return verdict;
+  // A wrong pointer to an earlier turn's real words is still that turn's value, checked there in full.
+  const holder = span.holderOf(answer.value.trim());
+  return holder && holder !== answer.ref ? checkAt({ ...answer, ref: holder }, span) : verdict;
+}
+
+function checkAt(answer: NamedValueAnswer, span: SpanTexts): Verdict {
   const value = answer.value.trim();
   const name = flat(answer.name);
   if (!value || value.length > VALUE_CHARS || !isNamedValueShape(value)) return rejected(answer.ref, "shape");

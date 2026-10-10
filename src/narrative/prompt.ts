@@ -99,7 +99,7 @@ function carriedBlock(carried: ReadonlyArray<{ ordinal: string; text: string }>)
   return `${CARRIED_GUIDANCE}\n<unsummarized-messages>\n${lines.join("\n")}\n</unsummarized-messages>`;
 }
 
-const SEED_GUIDANCE = "This session was compacted before by a different compactor; its summary is below. The state above is empty because of that, not because nothing happened. Carry forward from it what is still in force: decisions and dead ends as your own records, the user's standing corrections (quote the user's exact words; a quote is checked against every user message, so copy it verbatim), and next steps that are not yet done into now. Do not carry steps the conversation below shows done.";
+const SEED_GUIDANCE = "This session was compacted before by a different compactor; its summary is below. The state above is empty because of that, not because nothing happened. Carry forward from it what is still in force: decisions and dead ends as your own records, the user's standing corrections (quote the user's exact words; a quote is checked against every user message, so copy it verbatim), and next steps that are not yet done into now. Do not carry steps the conversation below shows done. A value it records that a later turn may need (a measurement, a hash, a port, a file-name format) goes in \"values\" with the u<n> of the earlier turn that showed it; code keeps it only where that turn shows it verbatim.";
 
 const rememberedText = (event: StateEvent): { kind: string; text: string } | undefined => {
   switch (event.kind) {

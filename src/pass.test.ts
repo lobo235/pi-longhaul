@@ -500,6 +500,20 @@ test("runStatePass: after a fallback, the messages of a Longhaul span that close
   assert.deepEqual(carried(result), ["u1 never mind the timing for now, just make it parse", "u3 never push straight to main, open a branch"]);
 });
 
+test("runStatePass: on a switchover a value the previous summary carried is kept when an earlier turn shows it; one only the summary states is not", async () => {
+  const earlier = [userEntry("m0", "time the parser on the big file"), assistantEntry("a0", "timing", [{ name: "bash", arguments: { command: "node bench.js" } }]), toolResultEntry("t0", "a0-t0", "bash", "median 153 ms over 20 runs\n[exit 0]"), compactionEntry("c0", { compactor: "another-compactor" })];
+  const span = branch();
+  const entries = chain([...earlier, ...span]);
+  const messages = span.filter((entry) => entry.type === "message").map((entry) => (entry as { message: AgentMessage }).message);
+  const input = inputOf(entries, { preparation: { ...inputOf(entries).preparation, messagesToSummarize: messages.slice(0, -1), turnPrefixMessages: messages.slice(-1), previousSummary: "## Progress\n- parser median 153 ms; 13,157 rows" } as never });
+  const deps = answering({ values: [{ name: "parser median", value: "153 ms", ref: "u1" }, { name: "row count", value: "13,157", ref: "u1" }] });
+  const result = await runStatePass(input, deps);
+  assert.match(result.compaction.summary, /## Learned values[^\n]*\n- 153 ms \(u1; parser median\)/);
+  assert.doesNotMatch(result.compaction.summary, /13,157/);
+  assert.match(deps.prompts[0], /<previous-summary>/);
+  assert.match(deps.prompts[0], /values[^.]*earlier turn/i, "the seed guidance asks for the summary's values with the earlier turn that shows them");
+});
+
 test("runStatePass: a value the summarizer names from a turn, and that turn shows, is kept under Learned values with its name, and carried in details", async () => {
   const timed = chain([
     userEntry("m1", "Build the state compactor and keep the ledger modules as they are"),

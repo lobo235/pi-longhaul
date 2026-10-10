@@ -19,7 +19,7 @@ import { fixedPromptChars, planChunks, renderNarrativePrompt, SEED_CONTEXT_EXCER
 import { onRouteFailure, onRouteSuccess, routedRetryPolicy, type RouteHealthConfig, type RouteHealthState } from "./route-health.ts";
 import type { CallTrace, NarrativeDiff, NarrativeOutcome, NotADiffReason } from "./types.ts";
 import type { LearnedValue } from "../learned.ts";
-import { spanTextsOf, type SpanTexts } from "./named-values.ts";
+import { spanTextsOf, withEarlierTurns, type SpanTexts } from "./named-values.ts";
 import { validateNarrativeDiff, type FieldError, type LabelQuestion, type Labelling } from "./validate.ts";
 import { isContextOverflowMessage } from "./fit.ts";
 import { renderWarmPrompt, WARM_HEAD, warmFits, type WarmBase } from "./warm.ts";
@@ -29,6 +29,8 @@ import { addCallUsage, EMPTY_PASS_USAGE } from "./usage.ts";
 
 export interface NarrativeInput {
   span: SpanInput;
+  /** On a switchover, the turns before the span, where a value the previous summary carried can be checked (named-values.ts withEarlierTurns). */
+  earlierTurns?: SpanTexts;
   state: SessionState;
   promptState: PromptState;
   verify: Omit<VerifyContext, "state">;
@@ -118,7 +120,7 @@ function labellingOf(run: Run, conversation: string, chunkIndex: number): Labell
   // Seed rules need no label (validate.ts Labelling.seed), but may carry one; a withdrawal of one is checked against its words.
   const seedRules = run.input.promptState.seed ? run.input.promptState.seedRules ?? [] : [];
   const texts = new Map([...seedRules.map((entry) => [entry.ordinal, entry.text] as const), ...context.map((entry) => [entry.ordinal, entry.text] as const), ...run.input.span.ordinals.map((entry) => [entry.ordinal, entry.text ?? entry.excerpt] as const)]);
-  run.spanTexts ??= spanTextsOf(run.input.span.messages);
+  run.spanTexts ??= withEarlierTurns(spanTextsOf(run.input.span.messages), run.input.earlierTurns);
   const spanTexts = run.spanTexts;
   // Carried messages and the switchover's other earlier messages are in no chunk's conversation: the first chunk
   // labels them. An earlier rule with no rule word in it ("tests go under tests/") is carried only by its label.
