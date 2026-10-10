@@ -51,6 +51,15 @@
         "one real compaction through pi --mode rpc on a long session: a compaction record with an accepted diff",
         "one paired scorer run: every arm scored without an error"
       ]
+    },
+    {
+      "pi": "1.1.0",
+      "date": "2026-10-10",
+      "how": [
+        "npm test on the vendored pi; no contract moved (three notice tests counted the unverified-pi notice and were pinned to a version)",
+        "npm run smoke: one compaction by pi 1.1.0 of the packed package, fake model",
+        "one real compaction through pi --mode rpc on the setup-check fixture with a local model: a compaction record, no fallback"
+      ]
     }
   ]
 }
