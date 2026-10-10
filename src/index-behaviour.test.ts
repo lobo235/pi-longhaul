@@ -214,7 +214,7 @@ test("on a pi this release was not verified against, a State session warns once 
     const { ctx, notices } = fakeCtx({ model: modelWith() });
     await emit("session_start", { reason: "startup" }, ctx);
     assert.deepEqual(notices.map((notice) => notice.level), ["warning"]);
-    assert.match(notices[0].text, new RegExp(`pi ${UNVERIFIED_PI.replace(/\./g, "\\.")} has not been verified`));
+    assert.ok(notices[0].text.includes(`pi ${UNVERIFIED_PI} has not been verified`), notices[0].text);
   });
 });
 
