@@ -87,22 +87,40 @@ function writeSession(root: string): { cwd: string; file: string } {
   return { cwd, file };
 }
 
+/**
+ * npm, run through the npm that started this script when there is one (`npm_execpath`), so no shell is needed; a
+ * direct run falls back to `npm` on the search path, through a shell on Windows, where it is a .cmd shim.
+ */
+function runNpm(args: string[], cwd: string): string {
+  const npmCli = process.env.npm_execpath;
+  if (npmCli && npmCli.endsWith(".js")) return execFileSync(process.execPath, [npmCli, ...args], { cwd, encoding: "utf8" });
+  return execFileSync("npm", args, { cwd, encoding: "utf8", shell: process.platform === "win32" });
+}
+
 /** The package as npm would publish it, unpacked where an install puts it; returns its directory. */
 function unpackedPackage(root: string): string {
-  const packed = JSON.parse(execFileSync("npm", ["pack", "--json", "--ignore-scripts", "--pack-destination", root], { cwd: repo, encoding: "utf8" })) as Array<{ filename: string }>;
-  const tarball = path.join(root, packed[0].filename);
-  execFileSync("tar", ["-xzf", tarball, "-C", root]);
+  const packed = JSON.parse(runNpm(["pack", "--json", "--ignore-scripts", "--pack-destination", root], repo)) as Array<{ filename: string }>;
+  // Relative operands, run from root: a tar that reads `C:` in an absolute Windows path as a remote host never sees one.
+  execFileSync("tar", ["-xzf", packed[0].filename], { cwd: root });
   const dir = path.join(root, "node_modules", "pi-longhaul");
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   fs.renameSync(path.join(root, "package"), dir);
   return dir;
 }
 
+/**
+ * The vendored pi's entry script, from its package.json `bin`. pi is started as `node <entry>` rather than through
+ * `node_modules/.bin/pi`: on Windows npm installs that bin as a .cmd shim, which spawn() cannot start without a shell.
+ */
+function piCli(): string {
+  const pkg = path.join(repo, "node_modules", "@earendil-works", "pi-coding-agent");
+  return path.join(pkg, (JSON.parse(fs.readFileSync(path.join(pkg, "package.json"), "utf8")) as { bin: { pi: string } }).bin.pi);
+}
+
 /** Runs pi in RPC mode, sends one compact command and resolves with pi's response to it. */
 function compactOnce(session: { cwd: string; file: string }, env: NodeJS.ProcessEnv, extension: string): Promise<{ success?: boolean; error?: string }> {
-  const pi = path.join(repo, "node_modules", ".bin", "pi");
   const args = ["--mode", "rpc", "--session", session.file, "--model", `${PROVIDER}/${MODEL}`, "-ne", "-e", extension];
-  const child = spawn(pi, args, { cwd: session.cwd, env, stdio: ["pipe", "pipe", "inherit"] });
+  const child = spawn(process.execPath, [piCli(), ...args], { cwd: session.cwd, env, stdio: ["pipe", "pipe", "inherit"] });
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => { child.kill(); reject(new Error(`no answer to compact within ${TIMEOUT_MS / 1000} s`)); }, TIMEOUT_MS);
     child.on("error", reject);

@@ -10,9 +10,15 @@ on:
 permissions:
   contents: read
 
+# One release per tag at a time, and never cancelled halfway through a publish.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -20,7 +26,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          cache: npm
+          # No npm cache on the release path: a cache entry saved by another run must not reach what is tested
+          # and published.
+          package-manager-cache: false
       - name: The tag matches package.json, and no placeholder is left
         env:
           TAG: ${{ github.ref_name }}
@@ -39,10 +47,11 @@ jobs:
   publish:
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: npm
     permissions:
       contents: read
-      id-token: write
+      id-token: write # npm trusted publishing (OIDC): no npm token is stored
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,6 +59,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
           registry-url: "https://registry.npmjs.org"
       - name: npm supports trusted publishing
         run: |
