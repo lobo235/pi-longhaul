@@ -69,7 +69,8 @@ The unlabeled measures work on any transcript store, including one with no label
 | `facts` | values first seen in the span's tool output, not said by the session in the span, not visible after the cut, and used again in the next 10 assistant messages, kept as a whole token. Mostly identifiers read from source files (`writeHead`, `readFileSync`), which the next turn reads again from the file; a value the assistant already reported to the user is excluded by construction. A wide summary that names many identifiers scores well on it, and the Learned values section, which keeps no code names and only values the span itself used, cannot raise it. The labeled `values` measure what a resumed session cannot look up | better |
 | `reused` | values first seen in the span's tool output, not visible after the cut and used again in the next 10 assistant messages, whether or not the span itself used them: what the Learned values section is for. Code names (identifiers, and dotted names with no file extension such as `process.exit`) are left out, by a test of its own rather than the section's | better |
 | `factsWithRecall` | `facts`, also counting a fact `longhaul_recall` finds, as `need` and `names` do; the same as `facts` for an arm without the tool | better |
-| `objectiveMoved` | compactions where the recorded objective changed (Longhaul only) | lower |
+| `objectiveMoved` | compactions where the recorded objective quotes a different message than the previous compaction's (Longhaul only; the same message in other words is no move). The objective is the request the work answers now, so a new request in the span warrants a move: 47 of these 76 compactions have a new user message in the span, and no label says which moves were warranted | context |
+| `objectiveBack` | of those, moves to an earlier message than the previous one (Longhaul only) | lower |
 | `claimWrong` | World claims that disagree with the ledger (Longhaul only) | lower |
 | `chars` | rendered size | context cost |
 | `in`, `out` | mean prompt and output tokens per compaction | cost |
@@ -198,8 +199,9 @@ What it says:
   is not.
 - **Cost.** One diff call per compaction: about half the prompt tokens, a fifth of the output tokens and a
   fifth of the median time of pi's own compaction on the same spans, with a smaller result.
-- **Weak spots.** The recorded objective changed at 42 of 76 compactions, more often than the scenarios' work
-  changes direction. 15 rule lines were stray, mostly one-off requests kept as rules.
+- **Weak spots.** 15 rule lines were stray, mostly one-off requests kept as rules. The recorded objective
+  changed at 42 of 76 compactions, and 47 of the 76 bring a new user message; the objective is the request the
+  work answers now, so this mostly follows the work (a later run counting by message: 45, none backward).
 
 **Takeover** (`SCORE_CHAIN=0`: every compaction replayed on its recorded path, so Longhaul is handed pi's
 summary of everything before the span, as when it is enabled in a session pi has already compacted):
@@ -218,6 +220,28 @@ Taking over is Longhaul's weak case today. It still keeps the span's own rules, 
 span stay in force (15 of 33 honoured), most values carried only in pi's summary are lost, and stray rule lines
 triple. A session that starts with Longhaul does not hit this; one that enables it midway does, at its first
 compaction.
+
+**Takeover, after the switchover fixes** (2026-10-10, commit `0b49d52` against `main` at `9660c95`, two runs of
+each, same model and settings). An earlier rule-shaped message may now carry a label, so one that replaced an
+earlier rule withdraws it; before, that label was dropped and both rules were recorded. And a value pi's summary
+carried may be named from the earlier turn that showed it.
+
+| labeled | `0b49d52` run 1 | run 2 | `main` run 1 | run 2 |
+|---|---|---|---|---|
+| `rules` | 216/227 | 206/227 | 212/227 | 204/227 |
+| `earlier` | 195/205 | 187/205 | 192/205 | 185/205 |
+| `lifts` | **28**/33 | **31**/33 | 22/33 | 26/33 |
+| `values` | 2/9 | 3/9 | 2/9 | 3/9 |
+| `history` | 1/5 | 1/5 | 1/5 | 2/5 |
+| `stray` (lower is better) | 49 | 58 | 51 | 49 |
+
+Withdrawn rules are now dropped about as often as pi's own summary drops them (28 and 31 of 33, against pi's
+31). Nothing else moved beyond the spread between two runs of the same code: the summarizer now can name an
+earlier turn's value (unlabeled `reused` 0.69 and 0.71 against 0.68 and 0.67), but on the nine labeled values it
+mostly named none, so values and history stay pi's strength on a takeover, and stray rule lines, mostly one-off
+requests kept as rules, are as many as before. The chained runs of the same pair (`state` 227/227 and 33/33
+lifts, `main` 217/227 and 33/33) differ less than two runs of near-identical code did (`stray` 15 at `900ead3`
+and 40 at `main`), so they are not read as a change.
 
 **`turns` mode** (chained, `state-turns`): `rules` 225/227, `span` 21/22, `earlier` 204/205, `lifts` 29/33,
 `values` 7/9, `history` 4/5, `stray` 5; `reused` 0.80, `facts` 0.29. It cuts stray rule lines from 15 to 5 and

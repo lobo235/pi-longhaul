@@ -138,12 +138,20 @@ export function correctionRetention(corrections: string[], rendered: string): Co
   return { retained: kept.length, total: corrections.length, share: shareOf(kept.length, corrections.length), missed, kept };
 }
 
-export function objectiveStability(previous: string | undefined, current: string | undefined): "stable" | "moved" | "set" | "none" {
+/**
+ * How the objective changed between two compactions, judged by the message it quotes: the same message in other
+ * words is no move. A move to an earlier message is `back`, apart from a move forward to the user's next request.
+ */
+export function objectiveStability(previous: ObjectiveRef | undefined, current: ObjectiveRef | undefined): "stable" | "moved" | "back" | "set" | "none" {
   if (!previous && !current) return "none";
   if (!previous) return "set";
-  if (!current || previous !== current) return "moved";
-  return "stable";
+  if (!current) return "moved";
+  if (previous.messageId === current.messageId) return "stable";
+  return ordinalNumber(current.ordinal) < ordinalNumber(previous.ordinal) ? "back" : "moved";
 }
+
+type ObjectiveRef = { messageId: string; ordinal: string };
+const ordinalNumber = (ordinal: string) => Number(/^u(\d+)$/.exec(ordinal)?.[1] ?? Number.NaN);
 
 export function claimCorrectness(claims: Claim[], commands: CommandRecord[]): { correct: number; total: number; wrong: Array<{ commandRef: string; claimed: number | null; ledger?: number | null }> } {
   const byId = new Map(commands.map((record) => [record.id, record]));
@@ -209,7 +217,7 @@ export interface ScoreRow {
   labeled?: LabeledMeasures;
 }
 
-export type ArmSummary = { n: number; renderedChars: number; needShare: number | null; correctionShare: number | null; objectiveMoved: number; claimWrong: number; fileShare: number | null; artifactShare: number | null; earlierCorrectionShare: number | null; earlierCorrectionsDistinct: { n: number; share: number | null }; durationP50Ms: number | null; durationP90Ms: number | null; probeShare: number | null; probePlanned: number | null; probePrecision: number | null; factShare: number | null; factRecallShare: number | null; reusedShare: number | null; warmShare: number | null; warmCached: number | null; inputTokens: number | null; outputTokens: number | null };
+export type ArmSummary = { n: number; renderedChars: number; needShare: number | null; correctionShare: number | null; objectiveMoved: number; objectiveBack: number; claimWrong: number; fileShare: number | null; artifactShare: number | null; earlierCorrectionShare: number | null; earlierCorrectionsDistinct: { n: number; share: number | null }; durationP50Ms: number | null; durationP90Ms: number | null; probeShare: number | null; probePlanned: number | null; probePrecision: number | null; factShare: number | null; factRecallShare: number | null; reusedShare: number | null; warmShare: number | null; warmCached: number | null; inputTokens: number | null; outputTokens: number | null };
 
 /** Nearest-rank percentile; null with no values. */
 export function percentile(values: number[], p: number): number | null {
@@ -260,7 +268,8 @@ export function summarize(rows: ScoreRow[], arms: readonly string[] = SCORE_ARMS
       renderedChars: own.length ? Math.round(own.reduce((sum, row) => sum + row.renderedChars, 0) / own.length) : 0,
       needShare: mean(own.map((row) => row.need.share)),
       correctionShare: mean(own.map((row) => row.corrections.share)),
-      objectiveMoved: own.filter((row) => row.objective === "moved").length,
+      objectiveMoved: own.filter((row) => row.objective === "moved" || row.objective === "back").length,
+      objectiveBack: own.filter((row) => row.objective === "back").length,
       claimWrong: own.reduce((sum, row) => sum + (row.claims?.wrong.length ?? 0), 0),
       fileShare: pooled(own.map((row) => row.names && { hit: row.names.files.covered, total: row.names.files.total })),
       artifactShare: pooled(own.map((row) => row.names && { hit: row.names.artifacts.covered, total: row.names.artifacts.total })),

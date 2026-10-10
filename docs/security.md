@@ -204,7 +204,14 @@ the session (a web page, a README, another agent's message) could try to plant a
   and lowercase too under a key that says seed, secret or key), or in the password part of `user:pass@` or `user/pass@` (in a URL the password may hold `/` and
   `:`, and the user may be empty), from any message and whichever turn it cites: punctuation, a connection string or a flag glued
   to a secret does not hide it. It may hold no space except between a number and its unit, so no
-  passphrase in prose is a value, and its name and value together must not read as a credential line.
+  passphrase in prose is a value, and its name and value together must not read as a credential line. On a
+  switchover (the previous compaction was another compactor's), the turns before the span (since the state last
+  judged one) count as sources too, by the same rules and as pi showed them: a value that summary records is kept
+  only where an earlier turn shows it verbatim (a wrong turn pointer resolves to the newest earlier turn that does;
+  inside the span it is the model's to fix), and a message a context edit replaced is a source only in its
+  replacement. A credential token anywhere in those turns refuses a value of the span as well, and so does one in
+  the original words of an edited message, in a message another extension injected, or on a credential line of the
+  summary, which is never a source itself.
 - The ledger redacts commands that carry a secret, by the same patterns (a one-time-password seed passed to
   `oathtool -b` (or `-bv`, `--base32`, or a hex or base32 key of 16 or more characters), `ykman oath accounts add`,
   `ykman ... --key`, `sshpass -p`, `htpasswd -b`, `openssl -pass pass:`, `keytool -storepass`, `redis-cli -a`,

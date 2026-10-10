@@ -32,10 +32,14 @@ test("userCorrections and correctionRetention: rule-shaped user messages, retain
 });
 
 test("objectiveStability and claimCorrectness (table)", () => {
+  const at = (ordinal: string, text = "build it") => ({ messageId: `m-${ordinal}`, ordinal, text });
   assert.equal(objectiveStability(undefined, undefined), "none");
-  assert.equal(objectiveStability(undefined, "build it"), "set");
-  assert.equal(objectiveStability("build it", "build it"), "stable");
-  assert.equal(objectiveStability("build it", "ship it"), "moved");
+  assert.equal(objectiveStability(undefined, at("u1")), "set");
+  assert.equal(objectiveStability(at("u1"), at("u1")), "stable");
+  assert.equal(objectiveStability(at("u1", "build it"), at("u1", "build it now")), "stable", "the same message quoted in other words is no move");
+  assert.equal(objectiveStability(at("u1"), at("u4", "ship it")), "moved");
+  assert.equal(objectiveStability(at("u4"), at("u2")), "back", "a move to an earlier message is counted apart");
+  assert.equal(objectiveStability(at("u4"), undefined), "moved");
   const commands = [{ id: "C1", command: "npm test", lastExitCode: 0, runs: 1, lastSeenPass: 1 }, { id: "C2", command: "make lint", lastExitCode: 1, runs: 1, lastSeenPass: 1 }] as never[];
   const claims = [{ kind: "test", commandRef: "C1", exitCode: 0, at: "x", stale: false }, { kind: "lint", commandRef: "C2", exitCode: 0, at: "x", stale: false }, { kind: "build", commandRef: "C9", exitCode: 0, at: "x", stale: false }] as never[];
   assert.deepEqual(claimCorrectness(claims, commands), { correct: 1, total: 3, wrong: [{ commandRef: "C2", claimed: 0, ledger: 1 }, { commandRef: "C9", claimed: 0, ledger: undefined }] });
@@ -44,8 +48,8 @@ test("objectiveStability and claimCorrectness (table)", () => {
 test("summarize: per-arm means over the rows, null when a measure had no denominators; pi's own compactor is an arm like the others", () => {
   const row = (arm: "state" | "pi-default", chars: number, share: number | null) => ({ arm, at: "x", session: "s", renderedChars: chars, need: { covered: 1, total: 2, share, missed: [] }, corrections: { retained: 1, total: 1, share: 1, missed: [] }, objective: arm === "state" ? ("moved" as const) : null, claims: arm === "state" ? { correct: 1, total: 2, wrong: [{ commandRef: "C1", claimed: 0, ledger: 1 }] } : null });
   const summary = summarize([row("state", 10000, 0.5), row("state", 14000, null), row("pi-default", 15000, 0.25)]);
-  assert.deepEqual(summary.state, { n: 2, renderedChars: 12000, needShare: 0.5, correctionShare: 1, objectiveMoved: 2, claimWrong: 2, fileShare: null, artifactShare: null, earlierCorrectionShare: null, earlierCorrectionsDistinct: { n: 0, share: null }, durationP50Ms: null, durationP90Ms: null, probeShare: null, probePlanned: null, probePrecision: null, factShare: null, factRecallShare: null, reusedShare: null, warmShare: null, warmCached: null, inputTokens: null, outputTokens: null });
-  assert.deepEqual(summary["pi-default"], { n: 1, renderedChars: 15000, needShare: 0.25, correctionShare: 1, objectiveMoved: 0, claimWrong: 0, fileShare: null, artifactShare: null, earlierCorrectionShare: null, earlierCorrectionsDistinct: { n: 0, share: null }, durationP50Ms: null, durationP90Ms: null, probeShare: null, probePlanned: null, probePrecision: null, factShare: null, factRecallShare: null, reusedShare: null, warmShare: null, warmCached: null, inputTokens: null, outputTokens: null });
+  assert.deepEqual(summary.state, { n: 2, renderedChars: 12000, needShare: 0.5, correctionShare: 1, objectiveMoved: 2, objectiveBack: 0, claimWrong: 2, fileShare: null, artifactShare: null, earlierCorrectionShare: null, earlierCorrectionsDistinct: { n: 0, share: null }, durationP50Ms: null, durationP90Ms: null, probeShare: null, probePlanned: null, probePrecision: null, factShare: null, factRecallShare: null, reusedShare: null, warmShare: null, warmCached: null, inputTokens: null, outputTokens: null });
+  assert.deepEqual(summary["pi-default"], { n: 1, renderedChars: 15000, needShare: 0.25, correctionShare: 1, objectiveMoved: 0, objectiveBack: 0, claimWrong: 0, fileShare: null, artifactShare: null, earlierCorrectionShare: null, earlierCorrectionsDistinct: { n: 0, share: null }, durationP50Ms: null, durationP90Ms: null, probeShare: null, probePlanned: null, probePrecision: null, factShare: null, factRecallShare: null, reusedShare: null, warmShare: null, warmCached: null, inputTokens: null, outputTokens: null });
   assert.equal(summary["state-turns"].n, 0);
   assert.equal(summary["state-warm"].n, 0, "every published arm is summarized, the ones with no rows included");
 });

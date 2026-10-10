@@ -112,7 +112,7 @@ export async function scoreState(candidate: Candidate, prep: Record<string, any>
   const row: ScoreRow = {
     arm, at: candidate.at, session: candidate.session, renderedChars: rendered.length,
     ...sharedMeasures(candidate, prep.firstKeptEntryId, rendered, recallable),
-    objective: objectiveStability(latestStateDetails(candidate.pathEntries)?.state.objective?.quote.text, details.state.objective?.quote.text),
+    objective: objectiveStability(latestStateDetails(candidate.pathEntries)?.state.objective?.quote, details.state.objective?.quote),
     claims: close && close.kind === "span.close" ? claimCorrectness(close.world.claims, result.pending.ledger.commands) : null,
     coverageAtCap,
     ...(usage.calls > 0 ? { tokens: { input: usage.input + usage.cacheRead, output: usage.output } } : {}),

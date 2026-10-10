@@ -32,8 +32,8 @@ Longhaul replaces that summary with a **Session state** that is carried forward 
 Whether this gives better sessions than pi's own compaction is measured, not assumed. On the published
 synthetic sessions with a local 27B reasoning model, Longhaul kept 226 of 227 labeled user rules in force
 against pi's 211, and all 9 labeled values against 7, at about a fifth of the compaction time and output
-tokens. pi's own summary carried more identifiers read from source files, and Longhaul does worse when it takes
-over a session pi has already compacted. [docs/evaluation.md](docs/evaluation.md) has the method and every
+tokens. pi's own summary carried more identifiers read from source files, and when Longhaul takes over a session
+pi has already compacted it keeps fewer of the values pi's summary carried. [docs/evaluation.md](docs/evaluation.md) has the method and every
 measure, including where pi's own does better.
 
 ## What the state looks like
@@ -334,13 +334,13 @@ newest pi and opens an issue when it breaks.
 
 ## Roadmap
 
-Each item is a GitHub issue labelled `roadmap`; there are no dates.
+Each item is a GitHub issue labelled [`roadmap`](https://github.com/lobo235/pi-longhaul/issues?q=is%3Aissue+label%3Aroadmap); there are no dates.
 
-- Summarize from the session's own warm request (prefix-cache reuse), pending a way to repeat pi's request.
-- Carry more of the values a session will need again, where pi's own summary does better today.
-- Caps that scale with the context window.
-- `turns` mode as a tested, gated option.
-- A project-level config limited to harmless keys.
+- [Summarize from the session's own warm request](https://github.com/lobo235/pi-longhaul/issues/6) (prefix-cache reuse), pending a way to repeat pi's request.
+- [Carry more of the values a session will need again](https://github.com/lobo235/pi-longhaul/issues/7), where pi's own summary does better today.
+- [Caps that scale with the context window](https://github.com/lobo235/pi-longhaul/issues/8).
+- [`turns` mode as a tested, gated option](https://github.com/lobo235/pi-longhaul/issues/9).
+- [A project-level config limited to harmless keys](https://github.com/lobo235/pi-longhaul/issues/10).
 
 ## Versioning
 

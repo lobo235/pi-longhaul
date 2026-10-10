@@ -133,6 +133,8 @@ export type Rejection =
   | { code: "lift-not-later"; target: string; targetOrdinal: string; ordinal: string }
   | { code: "lift-unnamed"; target: string; ordinal: string; rule: string }
   | { code: "no-objective" }
+  | { code: "objective-unchanged"; ordinal: string }
+  | { code: "objective-not-later"; ordinal: string; targetOrdinal: string }
   | { code: "unknown-evidence"; evidence: string }
   | { code: "remember-cap"; cap: number }
   | { code: "unlabelled"; refs: string[] }
@@ -170,6 +172,10 @@ export function describeRejection(rejection: Rejection): string {
       return `${rejection.target} was replaced by the rule ${rejection.by} gave (${rejection.replacement}); lift it only if this message withdraws that rule as well${rejection.alsoSet ? ", naming what it set of its own" : ""}, as "lifts ${rejection.by}" (or "rule and lifts ${rejection.by}"), otherwise leave it. ${rejection.by} said: "${rejection.rule}".${rejection.alsoSet ? ` Of its own it set: "${rejection.alsoSet}", which a lift of it withdraws too.` : ""}`;
     case "lift-not-later":
       return `A lift must quote a user message later than the correction it lifts: ${rejection.ordinal} is not later than ${rejection.targetOrdinal} (${rejection.target}).`;
+    case "objective-unchanged":
+      return `The objective already quotes ${rejection.ordinal}; it stands, do not retry.`;
+    case "objective-not-later":
+      return `${rejection.ordinal} is earlier than the objective's message ${rejection.targetOrdinal}; the objective moves only to a later request, so it stands. Do not retry.`;
     case "no-objective":
       return "No objective is set yet, so done-when cannot be attached; set the objective first.";
     case "unknown-evidence":

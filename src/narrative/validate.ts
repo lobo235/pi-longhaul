@@ -44,10 +44,18 @@ export interface Labelling {
   required: readonly string[];
   known?: readonly string[];
   textOf: (ordinal: string) => string | undefined;
-  /** The span's turn texts and credential tokens (named-values.ts spanTextsOf), which a named value is checked against; absent = no values kept. */
-  spanTexts?: SpanTexts;
+  /** The span's turn texts and credential tokens (named-values.ts spanTextsOf), which a named value is checked against, built on first use; absent = no values kept. */
+  spanTexts?: () => SpanTexts;
   /** How many characters of a message the model was shown, when it saw only the start (a switchover's earlier messages). */
   shownChars?: (ordinal: string) => number | undefined;
+  /**
+   * A switchover's earlier rule-shaped messages (pass.ts seedRuleEvents), in every chunk: a lift of one no label
+   * recorded withdraws it from the floor. A label is optional; in the chunk that owns them (`seedOwned`, the default)
+   * one left unlabeled and not named a one-off is labeled "rule" here, so it is recorded in message order and a
+   * replacement it makes is asked about.
+   */
+  seed?: readonly string[];
+  seedOwned?: boolean;
 }
 
 export function proposalsOf(diff: NarrativeDiff): Array<{ path: string; proposal: Proposal }> {
@@ -75,6 +83,10 @@ function withKnownEvidence(diff: NarrativeDiff, ctx: VerifyContext): NarrativeDi
 function labelEntries(diff: NarrativeDiff, labelling: Labelling, state: SessionState): { entries: Array<{ path: string; proposal: Proposal }>; errors: FieldError[]; withdrawn: string[]; labels: Map<string, Label> } {
   const known = labelling.known ?? labelling.required;
   const { labels, invalid } = readLabels(diff.labels, (ordinal) => known.includes(ordinal));
+  if (labelling.seedOwned !== false) {
+    const oneOffs = new Set(diff.oneOffs ?? []);
+    for (const ordinal of labelling.seed ?? []) if (!labels.has(ordinal) && !invalid.has(ordinal) && !oneOffs.has(ordinal)) labels.set(ordinal, { kind: "rule" });
+  }
   const errors: FieldError[] = [];
   const withdrawn = earlierLifts(labels, known, state, labelling, errors);
   const bad = (ref: string, detail: string) => errors.push({ path: `labels.${ref}`, rejection: { code: "bad-label", ref, detail }, fixable: true });
@@ -146,7 +158,9 @@ function refuseLift(labels: Map<string, Label>, ordinal: string, target: string,
  */
 function earlierLifts(labels: Map<string, Label>, known: readonly string[], state: SessionState, labelling: Labelling, errors: FieldError[]): string[] {
   const inState = new Set(activeCorrections(state).map((item) => item.quote.ordinal));
-  const earlier = (target: string) => /^u\d+$/.test(target) && !known.includes(target) && !inState.has(target);
+  // A seed rule no label records here is recorded after the diff by the floor, which is what a withdrawal of it stops.
+  const floorOnly = (target: string) => (labelling.seed ?? []).includes(target) && labels.get(target)?.kind !== "rule";
+  const earlier = (target: string) => /^u\d+$/.test(target) && (!known.includes(target) || floorOnly(target)) && !inState.has(target);
   const withdrawn: string[] = [];
   for (const [ordinal, label] of labels) {
     const handled = new Set<string>();
@@ -175,7 +189,7 @@ export function validateNarrativeDiff(diff: NarrativeDiff, ctx: VerifyContext, l
   const entries = [...own.slice(0, diff.objective ? 1 : 0), ...labelled.entries, ...own.slice(diff.objective ? 1 : 0)];
   const applied = applyProposals(entries.map((entry) => entry.proposal), ctx);
   const errors = applied.rejected.map(({ index, rejection }) => ({ path: entries[index].path, rejection, fixable: FIXABLE_CODES.has(rejection.code) }));
-  const named = labelling?.spanTexts && diff.values?.length ? checkNamedValues(diff.values, labelling.spanTexts) : { values: [], errors: [] };
+  const named = labelling?.spanTexts && diff.values?.length ? checkNamedValues(diff.values, labelling.spanTexts()) : { values: [], errors: [] };
   const questions = labelling ? replacementQuestions(labelled.labels, applied.state, labelling) : [];
   return { events: applied.events, errors: [...labelled.errors, ...errors, ...named.errors], state: applied.state, ...(named.values.length ? { values: named.values } : {}), ...(labelled.withdrawn.length ? { withdrawn: labelled.withdrawn } : {}), ...(questions.length ? { questions } : {}) };
 }

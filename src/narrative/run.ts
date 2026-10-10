@@ -19,7 +19,8 @@ import { fixedPromptChars, planChunks, renderNarrativePrompt, SEED_CONTEXT_EXCER
 import { onRouteFailure, onRouteSuccess, routedRetryPolicy, type RouteHealthConfig, type RouteHealthState } from "./route-health.ts";
 import type { CallTrace, NarrativeDiff, NarrativeOutcome, NotADiffReason } from "./types.ts";
 import type { LearnedValue } from "../learned.ts";
-import { spanTextsOf, type SpanTexts } from "./named-values.ts";
+import { quotableText } from "../intent.ts";
+import { spanTextsOf, withEarlierTurns, type SpanTexts } from "./named-values.ts";
 import { validateNarrativeDiff, type FieldError, type LabelQuestion, type Labelling } from "./validate.ts";
 import { isContextOverflowMessage } from "./fit.ts";
 import { renderWarmPrompt, WARM_HEAD, warmFits, type WarmBase } from "./warm.ts";
@@ -29,6 +30,10 @@ import { addCallUsage, EMPTY_PASS_USAGE } from "./usage.ts";
 
 export interface NarrativeInput {
   span: SpanInput;
+  /** On a switchover, the turns before the span, where a value the previous summary carried can be checked (named-values.ts withEarlierTurns); built on first use. */
+  earlierTurns?: () => SpanTexts | undefined;
+  /** A user message's own words by ordinal (the message index). */
+  userTextOf?: (ordinal: string) => string | undefined;
   state: SessionState;
   promptState: PromptState;
   verify: Omit<VerifyContext, "state">;
@@ -61,7 +66,7 @@ export interface NarrativeDeps {
 
 interface ChunkOutcome { values?: LearnedValue[]; withdrawn?: string[]; questions?: LabelQuestion[]; diff?: NarrativeDiff; events: StateEvent[]; rejected: NarrativeOutcome["rejected"]; state: SessionState; reason?: NotADiffReason; model?: string; warmOverflow?: true }
 
-type Run = { input: NarrativeInput; stages: Stages; deps: NarrativeDeps; now: () => number; calls: CallTrace[]; health: RouteHealthState; usage: NarrativeOutcome["usage"]; callsMs: number; validateMs: number; warm?: WarmBase; started: number; prepareMs?: number; spanTexts?: SpanTexts };
+type Run = { input: NarrativeInput; stages: Stages; deps: NarrativeDeps; now: () => number; calls: CallTrace[]; health: RouteHealthState; usage: NarrativeOutcome["usage"]; callsMs: number; validateMs: number; warm?: WarmBase; started: number; prepareMs?: number; spanTexts?: () => SpanTexts };
 
 
 function emptyOutcome(run: Run, kind: NarrativeOutcome["kind"], reason: NarrativeOutcome["reason"], started: number, prepareMs: number): NarrativeOutcome {
@@ -115,16 +120,27 @@ function labellingOf(run: Run, conversation: string, chunkIndex: number): Labell
   const span = run.input.span.ordinals.map((entry) => entry.ordinal);
   const context = run.input.promptState.seed ? run.input.promptState.seedContext ?? [] : [];
   const tagged = new Set([...conversation.matchAll(/\[(u\d+)\] /g)].map((match) => match[1]));
-  // Seed rules are not labeled, but a withdrawal of one is checked against its words (validate.ts earlierLifts).
+  // Seed rules need no label (validate.ts Labelling.seed), but may carry one; a withdrawal of one is checked against its words.
   const seedRules = run.input.promptState.seed ? run.input.promptState.seedRules ?? [] : [];
-  const texts = new Map([...seedRules.map((entry) => [entry.ordinal, entry.text] as const), ...context.map((entry) => [entry.ordinal, entry.text] as const), ...run.input.span.ordinals.map((entry) => [entry.ordinal, entry.text ?? entry.excerpt] as const)]);
-  run.spanTexts ??= spanTextsOf(run.input.span.messages);
-  const spanTexts = run.spanTexts;
+  // A seed rule's own text, not the whitespace-flattened one the prompt shows: a blockquote must still read as one (ownWords).
+  const seedText = (entry: { ordinal: string; text: string }) => { const raw = run.input.userTextOf?.(entry.ordinal); return raw === undefined ? entry.text : quotableText(raw).trim(); };
+  const texts = new Map([...seedRules.map((entry) => [entry.ordinal, seedText(entry)] as const), ...context.map((entry) => [entry.ordinal, entry.text] as const), ...run.input.span.ordinals.map((entry) => [entry.ordinal, entry.text ?? entry.excerpt] as const)]);
+  const spanTexts = (run.spanTexts ??= lazySpanTexts(run));
   // Carried messages and the switchover's other earlier messages are in no chunk's conversation: the first chunk
   // labels them. An earlier rule with no rule word in it ("tests go under tests/") is carried only by its label.
   const first = chunkIndex === 1 || run.warm ? [...(run.input.span.carried ?? []), ...context.map((entry) => entry.ordinal)] : [];
   const cut = new Set(context.map((entry) => entry.ordinal));
-  return { required: [...new Set([...first, ...(run.warm ? span : span.filter((ordinal) => tagged.has(ordinal)))])], known: [...cut, ...span], textOf: (ordinal) => texts.get(ordinal), spanTexts, shownChars: (ordinal) => (cut.has(ordinal) ? SEED_CONTEXT_EXCERPT_CHARS : undefined) };
+  const seed = seedRules.map((entry) => entry.ordinal);
+  // In message order, so a rule is recorded before a later message's label lifts it.
+  const known = [...new Set([...seed, ...cut, ...span])].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  const seedOwned = chunkIndex === 1 || run.warm !== undefined;
+  return { required: [...new Set([...first, ...(run.warm ? span : span.filter((ordinal) => tagged.has(ordinal)))])], known, textOf: (ordinal) => texts.get(ordinal), spanTexts, shownChars: (ordinal) => (cut.has(ordinal) ? SEED_CONTEXT_EXCERPT_CHARS : undefined), ...(seed.length ? { seed, seedOwned } : {}) };
+}
+
+/** The span's turn texts, and on a switchover the earlier turns, built only when an answer names a value. */
+function lazySpanTexts(run: Run): () => SpanTexts {
+  let built: SpanTexts | undefined;
+  return () => (built ??= withEarlierTurns(spanTextsOf(run.input.span.messages), run.input.earlierTurns?.()));
 }
 
 function validateAttempt(run: Run, diff: NarrativeDiff, state: SessionState, chunk: { index: number; conversation: string }) {
@@ -267,6 +283,8 @@ function answeredLifts(text: string, questions: readonly LabelQuestion[]): Map<s
 
 /** A kept rule label with lifts added: its words, when it gave them, stay. */
 function withLifts(kept: unknown, targets: readonly string[]): unknown {
+  // A seed rule left unlabeled was labeled "rule" by validation (validate.ts Labelling.seed).
+  if (kept === undefined) return `rule and lifts ${[...new Set(targets)].join(", ")}`;
   const label = labelOf(kept);
   if (typeof label === "string" || label.kind !== "rule") return kept;
   const lifts = [...new Set([...(label.lifts ?? []), ...targets])];

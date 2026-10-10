@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { checkNamedValues, spanTextsOf, type SpanTexts } from "./named-values.ts";
+import { checkNamedValues, turnTextsOf, spanTextsOf, withEarlierTurns, type SpanTexts } from "./named-values.ts";
 
 const turns = new Map([
   ["u3", "[u3] Time the parser on the big file.\nIt took 166 ms on 2,000 rows.\nbash: node bench.js\n166 ms"],
@@ -199,4 +199,30 @@ test("checkNamedValues: a value a secret-store command printed is never kept, ev
     ] as never);
     assert.deepEqual(checkNamedValues([{ name: "db root", value: "73a9c1f0e2", ref: "u1" }], span).values, [], command);
   }
+});
+
+test("withEarlierTurns: on a switchover a value an earlier turn shows is kept with that turn as its source, and a wrong pointer resolves to the newest earlier turn that shows it", () => {
+  const user = (text: string) => ({ role: "user", content: text, timestamp: 0 });
+  const tool = (text: string, toolName = "bash") => ({ role: "toolResult", toolName, toolCallId: "t", content: [{ type: "text", text }], isError: false, timestamp: 0 });
+  const earlier = turnTextsOf([
+    { ordinal: "u1", message: user("time the parser") },
+    { message: tool("median 153 ms over 20 runs") },
+    { ordinal: "u2", message: user("now the archive name") },
+    { message: tool("wrote backup-20260101.tar.gz") },
+    { message: tool("price 2768.48", "web_fetch") },
+    { message: tool("DB_PASSWORD=8090secret") },
+  ] as never);
+  const merged = withEarlierTurns(spanOf(textOf), earlier);
+  const checked = checkNamedValues([
+    { name: "median parse time", value: "153 ms", ref: "u1" },
+    { name: "the parse time again", value: "153 ms", ref: "u2" },
+    { name: "a web page's price", value: "2768.48", ref: "u2" },
+    { name: "only in the summary", value: "13,157", ref: "u1" },
+    { name: "first benchmark", value: "166 ms", ref: "u3" },
+  ], merged);
+  assert.deepEqual(checked.values, [{ name: "median parse time", value: "153 ms", source: "u1" }, { name: "first benchmark", value: "166 ms", source: "u3" }]);
+  assert.deepEqual(checked.errors.map((error) => [error.path, error.rejection.code]), [["values[2]", "value-not-in-turn"], ["values[3]", "value-not-in-turn"]]);
+  const resolved = checkNamedValues([{ name: "the parse time", value: "153 ms", ref: "u2" }], merged);
+  assert.deepEqual(resolved.values, [{ name: "the parse time", value: "153 ms", source: "u1" }], "a wrong pointer to a real earlier value is still the value");
+  assert.ok(merged.tainted.has("8090secret"), "an earlier turn's credential taints the span's values too");
 });

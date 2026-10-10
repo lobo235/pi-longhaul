@@ -49,7 +49,14 @@ entries and log event types. Rendered state text, prompt wording and section lay
   back in and a rule worded without a rule word ("tests go under tests/") is carried; one longer than the
   excerpt shown is recorded only from the exact words given for it. After a fallback (a failed pass, then pi's
   own compaction), only the messages since Longhaul's last whole span are offered, so a rule the state had
-  lifted or named a one-off is not recorded again.
+  lifted or named a one-off is not recorded again. An earlier rule-shaped message may carry a label too, so one that
+  replaced an earlier rule ("two-space indentation instead of tabs") withdraws it; left unlabeled it is recorded
+  in message order and a replacement it makes is asked about. A value the earlier summary records is kept when an
+  earlier turn shows it verbatim, checked as a span's value is; the summary itself is never a source.
+- The summarizer moves the objective only forward: quoting the objective's own message again changes nothing
+  (or attaches the done-when it lacked), and a move back to an earlier message is refused; an explicit
+  `longhaul_remember` may still point back. The scorer counts a move by the message quoted, and backward moves
+  apart (`objectiveBack`).
 - Learned values the summarizer names: a timing, a total or a port a turn reported, with a name and the turn
   it came from, kept only when it has a value's shape (a number, alone or with a unit, a version, a short
   hash, a path or file name, `<placeholders>` allowed in a name format, a host and port, a date), stands

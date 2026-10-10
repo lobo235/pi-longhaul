@@ -62,8 +62,13 @@ answer or a question). The user's other earlier messages are shown too, each cut
 labeled like a message of the span: a withdrawal ("the DRY: prefix rule is lifted") is labeled `lifts u<n>` and
 that rule is not carried, and a rule worded without a rule word ("tests go under tests/", "our servers run Node
 22") is labeled a rule and carried. An earlier message left unlabeled costs a retry, in both modes; one longer than
-the excerpt shown is recorded only from the exact words given for it. A one-off the model fails to mark is carried as a rule; it names
-its message and can be withdrawn like any correction. When the session already has a state, because a failed
+the excerpt shown is recorded only from the exact words given for it. A rule-shaped earlier message needs no label
+but may carry one, so one that replaced an earlier rule ("switch to two-space indentation instead of tabs") is
+labeled `rule and lifts u<n>`; left unlabeled it is recorded as a rule in message order, and a replacement it makes
+is asked about as in a span. A one-off the model fails to mark is carried as a rule; it names
+its message and can be withdrawn like any correction. A value the earlier summary records (a measurement, a hash,
+a port) is named with the earlier turn that showed it and kept only where that turn shows it verbatim, so the
+summary points at a value but never vouches for one. When the session already has a state, because a failed
 Longhaul pass fell back to pi's own compaction, only the messages since Longhaul's last whole span are offered:
 the state already judged everything before them, so a rule it had lifted or named a one-off is not recorded
 again. A span that closed narrative-less or with a chunk missing judged none or only some of its messages, so
