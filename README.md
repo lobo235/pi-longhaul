@@ -310,7 +310,7 @@ The threat model is in [docs/security.md](docs/security.md).
 
 Longhaul relies on parts of pi that are not a stable API, so each pi release line it supports is verified and
 listed in [pi-compat.json](pi-compat.json). On a listed line it runs silently. On any other pi it warns once
-per session and runs. If a compaction fails, pi's own compaction takes over. A nightly job tests against the
+per session and runs; a session that opted out of it (`PI_COMPACTOR=pi`) is not warned. If a compaction fails, pi's own compaction takes over. A nightly job tests against the
 newest pi and opens an issue when it breaks.
 
 ## Known issues

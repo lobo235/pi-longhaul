@@ -11,6 +11,11 @@ import { COMPACTOR_ENV, selectCompactor, STATE_LOADED_ENV } from "./select.ts";
 import { SPAN_ENTRY_TYPE } from "./store/events.ts";
 import { LINE_ENTRY_TYPE, readCompactionLine, renderCompactionLine } from "./compaction-line.ts";
 import { assistantEntry, chain, fakeCtx, fakePi, modelWith, NOT_RULES, textResponse, userEntry, withEnv } from "./test-support.ts";
+import { readPiCompat } from "./pi-compat.ts";
+
+/** A pi this release lists, and one it cannot: so a notice test does not change with the pi that is installed. */
+const VERIFIED_PI = readPiCompat().verified.at(-1)!.pi;
+const UNVERIFIED_PI = "999.0.0";
 
 test("loading the extension sets the loaded marker for another compactor's gate, keyed to this process", async () => {
   await withEnv({ [STATE_LOADED_ENV]: undefined, PI_COMPACT_STATE_DEBUG: "off" }, async () => {
@@ -175,7 +180,7 @@ test("a session model with a context window under 32k warns once per session, at
     const small = modelWith({ id: "tiny", contextWindow: 16_384 });
     const big = modelWith({ id: "roomy", contextWindow: 131_072 });
     const { pi, emit } = fakePi();
-    compactionStateExtension(pi);
+    compactionStateExtension(pi, { piVersion: VERIFIED_PI });
     const roomy = fakeCtx({ model: big });
     await emit("session_start", { reason: "startup" }, roomy.ctx);
     assert.equal(roomy.notices.length, 0);
@@ -190,10 +195,33 @@ test("a session model with a context window under 32k warns once per session, at
   });
 });
 
+test("at load the log records the running pi and whether this release was verified against it", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "longhaul-log-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const cases: Array<[string, string, boolean | "line"]> = [["a listed pi", VERIFIED_PI, true], ["a pi no line lists", UNVERIFIED_PI, false]];
+  for (const [name, piVersion, verified] of cases) {
+    const log = path.join(dir, `${name}.jsonl`);
+    await withEnv({ PI_COMPACT_STATE_DEBUG: log }, async () => compactionStateExtension(fakePi().pi, { piVersion }));
+    const loaded = fs.readFileSync(log, "utf8").trim().split("\n").map((line) => JSON.parse(line)).find((record) => record.event === "extension-loaded");
+    assert.deepEqual([loaded?.piVersion, loaded?.piVersionVerified], [piVersion, verified], name);
+  }
+});
+
+test("on a pi this release was not verified against, a State session warns once at start and names the version", async () => {
+  await withEnv({ PI_COMPACTOR: undefined, PI_COMPACT_STATE_DEBUG: "off" }, async () => {
+    const { pi, emit } = fakePi();
+    compactionStateExtension(pi, { piVersion: UNVERIFIED_PI });
+    const { ctx, notices } = fakeCtx({ model: modelWith() });
+    await emit("session_start", { reason: "startup" }, ctx);
+    assert.deepEqual(notices.map((notice) => notice.level), ["warning"]);
+    assert.ok(notices[0].text.includes(`pi ${UNVERIFIED_PI} has not been verified`), notices[0].text);
+  });
+});
+
 test("no small-window warning when the user opted out of the State compactor", async () => {
   await withEnv({ PI_COMPACTOR: "pi", PI_COMPACT_STATE_DEBUG: "off" }, async () => {
     const { pi, emit } = fakePi();
-    compactionStateExtension(pi);
+    compactionStateExtension(pi, { piVersion: UNVERIFIED_PI });
     const { ctx, notices } = fakeCtx({ model: modelWith({ contextWindow: 8_192 }) });
     await emit("session_start", { reason: "startup" }, ctx);
     assert.deepEqual(notices, []);
@@ -230,7 +258,7 @@ test("no localOnlyRoots warning when the user opted out of the State compactor",
   fs.writeFileSync(path.join(agentDir, "longhaul.json"), JSON.stringify({ localOnlyRoots: ["C:\\work"] }));
   await withEnv({ PI_CODING_AGENT_DIR: agentDir, PI_COMPACTOR: "pi", PI_COMPACT_STATE_DEBUG: "off" }, async () => {
     const { pi, emit } = fakePi();
-    compactionStateExtension(pi);
+    compactionStateExtension(pi, { piVersion: UNVERIFIED_PI });
     const { ctx, notices } = fakeCtx({ model: modelWith() });
     await emit("session_start", { reason: "startup" }, ctx);
     assert.deepEqual(notices, []);
