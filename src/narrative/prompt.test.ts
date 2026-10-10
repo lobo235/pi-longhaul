@@ -56,7 +56,7 @@ test("renderNarrativePrompt: system prompt first (cacheable), then state, ordina
   assert.ok(text.trimEnd().endsWith("</retry-note>"));
   assert.match(NARRATIVE_SYSTEM_PROMPT, /```json/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /"messageRef"/);
-  assert.equal(NARRATIVE_PROMPT_REVISION, "state-14");
+  assert.equal(NARRATIVE_PROMPT_REVISION, "state-15");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: every user message of the span is labeled, in every form the parser reads, whatever words it uses", () => {
@@ -124,6 +124,7 @@ test("renderNarrativePrompt: the earlier rules say the code records them and tha
   const state = { corrections: [], decisions: [], deadEnds: [], remembered: [], seed: "## Goal\nship it", seedRules: [{ ordinal: "u1", text: "never deploy on a friday" }] };
   const text = renderNarrativePrompt({ state, ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
   assert.match(text, /recorded as corrections automatically[\s\S]*"oneOffs": \["u3"\][\s\S]*<earlier-user-messages>\n\[u1\] never deploy on a friday\n<\/earlier-user-messages>/);
+  assert.match(text, /need no label unless one replaces or withdraws an earlier rule: label that one "rule and lifts u<n>" or "lifts u<n>"/, "a listed message that replaces a rule still lifts it");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: a file-name format the user chose is a value, placeholders and all", () => {
