@@ -10,8 +10,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ### Added
 
-- Verified pi release lines in `pi-compat.json` (0.87, 0.99, 1.0 and 1.1); on any other pi Longhaul runs and
-  warns once per session, except in a session that opted out of it (`PI_COMPACTOR=pi`).
+- `pi-compat.json`, the pi release lines Longhaul is verified against; on any other pi it runs and warns once
+  per session, except in a session that opted out of it (`PI_COMPACTOR=pi`).
 - The State compactor as a standalone pi package: a verified Session state carried across
   compactions instead of a rewritten summary, with the `longhaul_remember` and `longhaul_recall` tools.
 - Windows: `localOnlyRoots` takes Windows paths (`C:\...`, `\\server\share\...`, `~\...`), matched by Windows
