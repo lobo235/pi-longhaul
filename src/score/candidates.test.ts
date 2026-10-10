@@ -6,7 +6,10 @@ import path from "node:path";
 
 import { candidateKey, candidates, nothingToScore, pathTo, readTranscript } from "./candidates.ts";
 
-function transcript(header: object | null = { type: "session", version: 3, id: "abc", timestamp: "2026-09-28T10:00:00.000Z", cwd: "/tmp/p" }): string {
+/** The recorded session's directory, absolute by the rules of the OS running the tests (`D:\tmp\p` on Windows). */
+const PROJECT = path.resolve("/tmp/p");
+
+function transcript(header: object | null = { type: "session", version: 3, id: "abc", timestamp: "2026-09-28T10:00:00.000Z", cwd: PROJECT }): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "score-"));
   const file = path.join(dir, "2026-09-28T10-00-00_abc.jsonl");
   const lines = [
@@ -51,14 +54,14 @@ test("candidates: `only` replays exactly the named (session, at) pairs, so a bef
 });
 
 test("candidates: a session under a Local-only root is never replayed unless opted in, and neither is one with no recorded directory", () => {
-  const localOnly = (cwd: string | undefined) => cwd === "/tmp/p";
+  const localOnly = (cwd: string | undefined) => cwd === PROJECT;
   const dir = transcript();
-  assert.equal(candidates(dir, { n: 10 }).at(0)?.cwd, "/tmp/p", "the candidate carries the session's own directory");
+  assert.equal(candidates(dir, { n: 10 }).at(0)?.cwd, PROJECT, "the candidate carries the session's own directory");
   assert.equal(candidates(dir, { n: 10, isLocalOnly: localOnly }).length, 0, "the scorer's model may be remote: a local-only transcript stays on the machine");
   assert.equal(candidates(dir, { n: 10, only: new Set([candidateKey("2026-09-28T10-00-00_abc", "2026-09-28T10:00:03.000Z")]), isLocalOnly: localOnly }).length, 0, "a paired run is filtered too");
   assert.equal(candidates(dir, { n: 10, isLocalOnly: localOnly, includeLocalOnly: true }).length, 1);
-  assert.equal(candidates(dir, { n: 10, localOnlyRoots: ["/tmp/p"] }).length, 0, "the default test reads the configured roots");
-  assert.equal(candidates(dir, { n: 10, localOnlyRoots: ["/tmp/other"] }).length, 1);
+  assert.equal(candidates(dir, { n: 10, localOnlyRoots: [PROJECT] }).length, 0, "the default test reads the configured roots");
+  assert.equal(candidates(dir, { n: 10, localOnlyRoots: [path.resolve("/tmp/other")] }).length, 1);
   const headless = transcript(null);
   assert.equal(candidates(headless, { n: 10 }).length, 0, "an unknown directory fails closed");
   assert.equal(candidates(headless, { n: 10, includeLocalOnly: true }).length, 1);

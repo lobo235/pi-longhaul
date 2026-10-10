@@ -74,7 +74,8 @@ export function homeDirectory(): string | undefined {
 /**
  * The Local-only root (CONTEXT.md) `cwd` works under, or undefined. A root is the Longhaul config's
  * `localOnlyRoots` entry: a session working in a project's subdirectory is still that project, so a
- * root matches itself and everything beneath it. `~` expands with `home`, and "beneath" is decided by
+ * root matches itself and everything beneath it. `~` expands with `home` (undefined: unknown, so a `~` root
+ * never matches; callers pass `homeDirectory()`), and "beneath" is decided by
  * the platform's path rules (`path.relative`: a separator boundary, so `~/dev/notes-2` is NOT
  * `~/dev/notes`; on Windows either separator, no case, and never across drives). Both sides are
  * canonicalized before the comparison (`fs.realpathSync`, falling back to the deepest existing ancestor
@@ -85,7 +86,7 @@ export function homeDirectory(): string | undefined {
 export function localOnlyRootOf(
   cwd: string | undefined,
   roots: readonly string[],
-  home: string | undefined = homeDirectory(),
+  home: string | undefined,
   rules: PathRules = path,
   realpath: Realpath = realpathSync,
 ): string | undefined {

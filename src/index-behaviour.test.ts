@@ -204,16 +204,19 @@ test("a localOnlyRoots entry that cannot match warns, naming it, at session star
   const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "longhaul-agent-"));
   t.after(() => fs.rmSync(agentDir, { recursive: true, force: true }));
   const write = (roots: string[]) => fs.writeFileSync(path.join(agentDir, "longhaul.json"), JSON.stringify({ localOnlyRoots: roots }));
+  // A path of the other platform can never match this one's session directories.
+  const [usable, unusable] = process.platform === "win32" ? ["C:\\ok", "/srv/work"] : ["/srv/ok", "C:\\work"];
   await withEnv({ PI_CODING_AGENT_DIR: agentDir, PI_COMPACTOR: "state", PI_COMPACT_STATE_DEBUG: "off" }, async () => {
-    write(["/srv/ok", "C:\\work"]);
+    write([usable, unusable]);
     const { pi, emit } = fakePi();
     compactionStateExtension(pi);
     const { ctx, notices } = fakeCtx({ branch: [], model: modelWith() });
     await emit("session_start", { reason: "startup" }, ctx);
     const named = (entry: string) => notices.filter((notice) => notice.text.includes(`"${entry}"`) && /localOnlyRoots/.test(notice.text));
-    assert.equal(named("C:\\work").length, 1);
-    assert.equal(named("C:\\work")[0].level, "warning");
-    write(["/srv/ok", "C:\\work", "relative/dir"]);
+    assert.equal(named(usable).length, 0);
+    assert.equal(named(unusable).length, 1);
+    assert.equal(named(unusable)[0].level, "warning");
+    write([usable, unusable, "relative/dir"]);
     await emit("session_before_compact", { preparation: undefined, branchEntries: [], reason: "manual", willRetry: false, signal: new AbortController().signal }, ctx);
     assert.equal(named("relative/dir").length, 1, "an entry added mid-session is named at the next compaction");
     await emit("session_before_compact", { preparation: undefined, branchEntries: [], reason: "manual", willRetry: false, signal: new AbortController().signal }, ctx);

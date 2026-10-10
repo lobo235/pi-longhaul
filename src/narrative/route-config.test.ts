@@ -8,7 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path, { join } from "node:path";
 
 import {
@@ -24,6 +24,10 @@ import { DEFAULT_ROUTE_HEALTH } from "./route-health.ts";
 const HOME = "/home/agent";
 /** The Longhaul config's `localOnlyRoots` in these tests. */
 const ROOTS = ["~/dev/notes", "~/dev/private"];
+/** A realpath that finds nothing: the path-only tests never touch the disk. */
+const noRealpath = (p: string): string => { throw Object.assign(new Error(`ENOENT: ${p}`), { code: "ENOENT" }); };
+/** localOnlyRootOf under POSIX rules: these cases spell POSIX paths, so they mean the same on every OS. */
+const posixRootOf = (cwd: string | undefined, roots: readonly string[], home: string | undefined) => localOnlyRootOf(cwd, roots, home, path.posix, noRealpath);
 
 // --- the route's circuit-breaker policy (longhaul.json) ------------------------
 
@@ -156,39 +160,40 @@ test("every local-only root self-summarizes even when the config names a route",
 // --- the pin matches the project, not a name ---------------------------------
 
 test("the pin matches the root and anything beneath it, and nothing else", () => {
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes`, ROOTS, HOME), `${HOME}/dev/notes`);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes/worktrees/x`, ROOTS, HOME), `${HOME}/dev/notes`);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes/`, ROOTS, HOME), `${HOME}/dev/notes`);
+  assert.equal(posixRootOf(`${HOME}/dev/notes`, ROOTS, HOME), `${HOME}/dev/notes`);
+  assert.equal(posixRootOf(`${HOME}/dev/notes/worktrees/x`, ROOTS, HOME), `${HOME}/dev/notes`);
+  assert.equal(posixRootOf(`${HOME}/dev/notes/`, ROOTS, HOME), `${HOME}/dev/notes`);
   // The boundary is a separator: a sibling whose name starts with the root's is a different project.
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes-2`, ROOTS, HOME), undefined);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notesbook`, ROOTS, HOME), undefined);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/app`, ROOTS, HOME), undefined);
+  assert.equal(posixRootOf(`${HOME}/dev/notes-2`, ROOTS, HOME), undefined);
+  assert.equal(posixRootOf(`${HOME}/dev/notesbook`, ROOTS, HOME), undefined);
+  assert.equal(posixRootOf(`${HOME}/dev/app`, ROOTS, HOME), undefined);
 });
 
 test("an unresolvable HOME cannot pin: an unexpanded root never matches", () => {
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes`, ROOTS, ""), undefined);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes`, ["~/dev/notes"], undefined), undefined);
+  assert.equal(posixRootOf(`${HOME}/dev/notes`, ROOTS, ""), undefined);
+  // `undefined` is an unknown home, never "use this machine's": the real home must not stand in for it.
+  assert.equal(localOnlyRootOf(join(homedir(), "dev", "notes"), ["~/dev/notes"], undefined), undefined);
 });
 
 test("a session with no cwd is never pinned", () => {
-  assert.equal(localOnlyRootOf(undefined, ROOTS, HOME), undefined);
-  assert.equal(localOnlyRootOf("", ROOTS, HOME), undefined);
+  assert.equal(posixRootOf(undefined, ROOTS, HOME), undefined);
+  assert.equal(posixRootOf("", ROOTS, HOME), undefined);
 });
 
 test("an absolute root is matched without HOME, and a relative one is ignored", () => {
-  assert.equal(localOnlyRootOf("/srv/notes", ["/srv/notes"], undefined), "/srv/notes");
-  assert.equal(localOnlyRootOf("/srv/notes", ["srv/notes"], undefined), undefined);
+  assert.equal(posixRootOf("/srv/notes", ["/srv/notes"], undefined), "/srv/notes");
+  assert.equal(posixRootOf("/srv/notes", ["srv/notes"], undefined), undefined);
 });
 
 // --- canonicalization (security.md T5) --------------------------------------
 
 test("a `..` segment that leaves the pinned root is not pinned (security.md T5)", () => {
   // The string test this replaces would MATCH both of these: the spelling starts with "/srv/notes/".
-  assert.equal(localOnlyRootOf("/srv/notes/../outside", ["/srv/notes"], undefined), undefined);
-  assert.equal(localOnlyRootOf("/srv/notes/sub/../../outside", ["/srv/notes"], undefined), undefined);
+  assert.equal(posixRootOf("/srv/notes/../outside", ["/srv/notes"], undefined), undefined);
+  assert.equal(posixRootOf("/srv/notes/sub/../../outside", ["/srv/notes"], undefined), undefined);
   // The genuinely-inside cases still pin, so the canonicalization is not vacuous.
-  assert.equal(localOnlyRootOf("/srv/notes/sub", ["/srv/notes"], undefined), "/srv/notes");
-  assert.equal(localOnlyRootOf("/srv/notes/../notes/sub", ["/srv/notes"], undefined), "/srv/notes");
+  assert.equal(posixRootOf("/srv/notes/sub", ["/srv/notes"], undefined), "/srv/notes");
+  assert.equal(posixRootOf("/srv/notes/../notes/sub", ["/srv/notes"], undefined), "/srv/notes");
 });
 
 test("a symlinked component that escapes the root is not pinned (security.md T5)", (t) => {
@@ -211,9 +216,9 @@ test("a symlinked component that escapes the root is not pinned (security.md T5)
 });
 
 test("a sibling whose name only starts with the root's is still rejected after canonicalization", () => {
-  assert.equal(localOnlyRootOf("/srv/notes-2", ["/srv/notes"], undefined), undefined);
-  assert.equal(localOnlyRootOf("/srv/notes-2/sub", ["/srv/notes"], undefined), undefined);
-  assert.equal(localOnlyRootOf("/srv/notesbook", ["/srv/notes"], undefined), undefined);
+  assert.equal(posixRootOf("/srv/notes-2", ["/srv/notes"], undefined), undefined);
+  assert.equal(posixRootOf("/srv/notes-2/sub", ["/srv/notes"], undefined), undefined);
+  assert.equal(posixRootOf("/srv/notesbook", ["/srv/notes"], undefined), undefined);
 });
 
 for (const [name, rule, expected] of [
@@ -227,8 +232,6 @@ for (const [name, rule, expected] of [
 // --- Windows paths, matched by Windows rules (path.win32), whatever the host -----------------------
 
 const WIN_HOME = "C:\\Users\\agent";
-/** No path exists on this host by its Windows spelling: the matcher falls back to the path as resolved. */
-const noRealpath = (p: string): string => { throw Object.assign(new Error(`ENOENT: ${p}`), { code: "ENOENT" }); };
 
 test("Windows: a drive or home-relative root pins itself and what is beneath it, by either separator and any case", () => {
   const roots = ["C:\\work\\notes", "~\\dev\\private", "~/dev/mixed"];
@@ -260,6 +263,6 @@ test("Windows: a drive or UNC root is usable, a relative or drive-relative one i
 
 test("POSIX rules stay POSIX: a backslash is part of a name, and a drive path is not absolute", () => {
   assert.match(unusableLocalOnlyRoot("C:\\work\\notes", HOME, path.posix) ?? "", /not an absolute POSIX path/);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes\\x`, ROOTS, HOME, path.posix, noRealpath), undefined);
-  assert.equal(localOnlyRootOf(`${HOME}/dev/notes/x`, ROOTS, HOME, path.posix, noRealpath), `${HOME}/dev/notes`);
+  assert.equal(posixRootOf(`${HOME}/dev/notes\\x`, ROOTS, HOME), undefined);
+  assert.equal(posixRootOf(`${HOME}/dev/notes/x`, ROOTS, HOME), `${HOME}/dev/notes`);
 });
