@@ -103,7 +103,7 @@ entries and log event types. Rendered state text, prompt wording and section lay
   contributor guides (AGENTS.md, CONTRIBUTING.md, SECURITY.md, issue and pull request templates).
 - CI: tests on Linux, macOS and Windows, a compaction smoke that loads the packed package
   into a real pi with a fake model, a secret scan, a workflow security audit (zizmor), Dependabot updates and a package-contents check; a nightly run against the newest pi; npm publishing
-  by trusted publishing.
+  by trusted publishing, then a GitHub Release carrying the tag's changelog notes.
 - `docs/how-it-works.md`: a compaction step by step, the log records, and the tools for looking at a state.
 - `eval/` (repository only): six synthetic scenarios, and the recorder and checker that make the
   evaluation sessions; `eval/matrix.ts`, one model-matrix cell: a real compaction on a given provider and

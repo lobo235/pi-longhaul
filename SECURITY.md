@@ -14,7 +14,7 @@ published once a fixed version is available, crediting you unless you prefer oth
 
 ## Supported versions
 
-The latest release. Before 1.0.0, the latest release candidate.
+The latest release.
 
 ## Scope
 

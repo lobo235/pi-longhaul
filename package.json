@@ -1,7 +1,7 @@
 {
   "name": "pi-longhaul",
   "version": "0.0.0",
-  "description": "Longhaul, a state compactor for pi: carries a verified Session state across compactions instead of a rewritten summary.",
+  "description": "Keep pi sessions working all night. A compactor that carries your session forward instead of rewriting it: your rules kept in your own words, the state written by code, old reasoning left behind, and about 5x faster than pi's own compaction on a local model.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -15,13 +15,24 @@
   "keywords": [
     "pi-package",
     "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "coding-agent",
+    "llm",
+    "ai-agents",
     "compaction",
-    "coding-agent"
+    "context-compaction",
+    "context-window",
+    "summarization",
+    "agent-memory",
+    "long-running",
+    "local-llm"
   ],
   "pi": {
     "extensions": [
       "./src/index.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.0.0/.github/assets/infographic.png"
   },
   "files": [
     "src/**/*.ts",

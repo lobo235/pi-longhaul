@@ -39,6 +39,8 @@ jobs:
             echo "replace the OWNER placeholder before releasing" >&2; exit 1
           fi
           grep -q "^## \[$TAG\]" CHANGELOG.md || { echo "CHANGELOG.md has no ## [$TAG] section" >&2; exit 1; }
+          image="$(node -p "require('./package.json').pi?.image ?? ''")"
+          case "$image" in */"$TAG"/*) ;; *) echo "package.json pi.image ($image) is not pinned to $TAG" >&2; exit 1 ;; esac
       - run: npm ci
       - run: npm test
       - run: npm run smoke
@@ -73,3 +75,25 @@ jobs:
             *-*) npm publish --access public --tag next ;;
             *) npm publish --access public ;;
           esac
+
+  github-release:
+    # After npm has the version, so a GitHub Release never names a version npm does not have.
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # create the Release for the tag
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: GitHub Release from the tag's CHANGELOG.md section
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          awk -v tag="$TAG" 'index($0, "## [" tag "]") == 1 {on=1; next} on && /^## \[/ {exit} on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "CHANGELOG.md has no notes under ## [$TAG]" >&2; exit 1; }
+          flags=(--verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md")
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$TAG" "${flags[@]}"
