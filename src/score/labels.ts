@@ -6,7 +6,8 @@
  *
  * Due, at one compaction:
  * - a rule, when its message was summarized (before the cut) and its lift, if any, has not been given yet;
- * - a lift, when both the rule and the lift were summarized: the rule must then not be shown in force;
+ * - a lift, when both the rule and the lift were summarized: the rule must then not be shown in force (the lift's own
+ *   line, which quotes the rule's words, does not count);
  * - a value, at the last compaction before the turn that uses it, when its turn was summarized and the kept window
  *   does not show it again;
  * - the goal (the message that says what the session is building), once that message was summarized: kept when any
@@ -37,7 +38,7 @@ export interface LabeledMeasures {
   values: Count & { missed: string[] };
   /** The values only the conversation holds (`history`): the workspace cannot give them back. */
   historyValues: Count;
-  /** A state's rule lines bound to a message no rule was labeled at; absent for a text with no bound rule lines. */
+  /** A state's rule lines bound to a message no rule or lift was labeled at; absent for a text with no bound rule lines. */
   strayRules?: string[];
 }
 
@@ -123,7 +124,9 @@ function measureRules(labels: SessionLabels, ordinals: ReturnType<typeof ordinal
   const kept = due.filter(holds);
   const inSpan = (rule: RuleLabel) => (ordinals.at.get(rule.at) ?? 0) >= since;
   const liftsDue = labels.rules.filter((rule) => before(rule.at) && before(rule.liftedAt));
-  const shownInForce = liftsDue.filter((rule) => ruleLines.some((line) => new RegExp(rule.marker, "i").test(line) && !showsLifted(line))).map((rule) => rule.at);
+  /** The lift's own line, quoted verbatim, repeats the rule's words without saying "lifted" outside its quote. */
+  const isLiftOf = (rule: RuleLabel, line: string) => BOUND_RULE.exec(line)?.[1] === rule.liftedAt;
+  const shownInForce = liftsDue.filter((rule) => ruleLines.some((line) => new RegExp(rule.marker, "i").test(line) && !showsLifted(line) && !isLiftOf(rule, line))).map((rule) => rule.at);
   return {
     rules: { kept: kept.length, total: due.length, missed: due.filter((rule) => !kept.includes(rule)).map((rule) => rule.at) },
     spanRules: { kept: kept.filter(inSpan).length, total: due.filter(inSpan).length },
@@ -153,7 +156,7 @@ function measureValues(labels: SessionLabels, candidate: Candidate, ordinals: Re
 function strayRulesOf(labels: SessionLabels, ruleLines: string[]): string[] | undefined {
   const bound = ruleLines.flatMap((line) => BOUND_RULE.exec(line)?.[1] ?? []);
   if (bound.length === 0) return undefined;
-  const labeled = new Set(labels.rules.map((rule) => rule.at));
+  const labeled = new Set(labels.rules.flatMap((rule) => (rule.liftedAt ? [rule.at, rule.liftedAt] : [rule.at])));
   return bound.filter((ordinal) => !labeled.has(ordinal));
 }
 

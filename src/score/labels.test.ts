@@ -60,6 +60,15 @@ test("labeledMeasures: a lift word inside the rule's own quoted words does not m
   assert.deepEqual(marked.lifts.shownInForce, []);
 });
 
+test("labeledMeasures: the lift's own line, quoted verbatim, is the lift and not the rule in force", () => {
+  const liftLine = "## Constraints\n- R2 [u4] \"The npm rule is lifted.\"\n";
+  const carried = labeledMeasures(labels, candidate(), "m5", liftLine);
+  assert.deepEqual([carried.lifts.honoured, carried.lifts.total], [1, 1]);
+  assert.deepEqual(carried.strayRules, [], "a line bound to a labeled lift is not a stray rule");
+  const both = labeledMeasures(labels, candidate(), "m5", `${liftLine}- R1 [u1] "Never add npm dependencies."\n`);
+  assert.deepEqual(both.lifts.shownInForce, ["u1"], "the rule's own line still shows it in force");
+});
+
 test("labeledMeasures: a rule or lift still in the kept window is not due, since the message itself is still there", () => {
   const early = labeledMeasures(labels, candidate(), "m4", "");
   assert.deepEqual([early.rules.total, early.lifts.total], [1, 0], "u3 is due; u1's lift is in the kept window, so neither keeping nor dropping u1 is judged");
