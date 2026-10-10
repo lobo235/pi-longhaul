@@ -115,7 +115,7 @@ function labellingOf(run: Run, conversation: string, chunkIndex: number): Labell
   const span = run.input.span.ordinals.map((entry) => entry.ordinal);
   const context = run.input.promptState.seed ? run.input.promptState.seedContext ?? [] : [];
   const tagged = new Set([...conversation.matchAll(/\[(u\d+)\] /g)].map((match) => match[1]));
-  // Seed rules are not labeled, but a withdrawal of one is checked against its words (validate.ts earlierLifts).
+  // Seed rules need no label (validate.ts Labelling.seed), but may carry one; a withdrawal of one is checked against its words.
   const seedRules = run.input.promptState.seed ? run.input.promptState.seedRules ?? [] : [];
   const texts = new Map([...seedRules.map((entry) => [entry.ordinal, entry.text] as const), ...context.map((entry) => [entry.ordinal, entry.text] as const), ...run.input.span.ordinals.map((entry) => [entry.ordinal, entry.text ?? entry.excerpt] as const)]);
   run.spanTexts ??= spanTextsOf(run.input.span.messages);
@@ -124,7 +124,11 @@ function labellingOf(run: Run, conversation: string, chunkIndex: number): Labell
   // labels them. An earlier rule with no rule word in it ("tests go under tests/") is carried only by its label.
   const first = chunkIndex === 1 || run.warm ? [...(run.input.span.carried ?? []), ...context.map((entry) => entry.ordinal)] : [];
   const cut = new Set(context.map((entry) => entry.ordinal));
-  return { required: [...new Set([...first, ...(run.warm ? span : span.filter((ordinal) => tagged.has(ordinal)))])], known: [...cut, ...span], textOf: (ordinal) => texts.get(ordinal), spanTexts, shownChars: (ordinal) => (cut.has(ordinal) ? SEED_CONTEXT_EXCERPT_CHARS : undefined) };
+  const seed = seedRules.map((entry) => entry.ordinal);
+  // In message order, so a rule is recorded before a later message's label lifts it.
+  const known = [...new Set([...seed, ...cut, ...span])].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  const owned = chunkIndex === 1 || run.warm ? { seed } : {};
+  return { required: [...new Set([...first, ...(run.warm ? span : span.filter((ordinal) => tagged.has(ordinal)))])], known, textOf: (ordinal) => texts.get(ordinal), spanTexts, shownChars: (ordinal) => (cut.has(ordinal) ? SEED_CONTEXT_EXCERPT_CHARS : undefined), ...owned };
 }
 
 function validateAttempt(run: Run, diff: NarrativeDiff, state: SessionState, chunk: { index: number; conversation: string }) {
@@ -267,6 +271,8 @@ function answeredLifts(text: string, questions: readonly LabelQuestion[]): Map<s
 
 /** A kept rule label with lifts added: its words, when it gave them, stay. */
 function withLifts(kept: unknown, targets: readonly string[]): unknown {
+  // A seed rule left unlabeled was labeled "rule" by validation (validate.ts Labelling.seed).
+  if (kept === undefined) return `rule and lifts ${[...new Set(targets)].join(", ")}`;
   const label = labelOf(kept);
   if (typeof label === "string" || label.kind !== "rule") return kept;
   const lifts = [...new Set([...(label.lifts ?? []), ...targets])];

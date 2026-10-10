@@ -48,6 +48,12 @@ export interface Labelling {
   spanTexts?: SpanTexts;
   /** How many characters of a message the model was shown, when it saw only the start (a switchover's earlier messages). */
   shownChars?: (ordinal: string) => number | undefined;
+  /**
+   * A switchover's earlier rule-shaped messages (pass.ts seedRuleEvents): a label is optional, and one left unlabeled
+   * is labeled "rule" here, so it is recorded in message order and a replacement it makes is asked about. Only the
+   * chunk that owns them passes this; the others still accept a lift of one through `known`.
+   */
+  seed?: readonly string[];
 }
 
 export function proposalsOf(diff: NarrativeDiff): Array<{ path: string; proposal: Proposal }> {
@@ -75,6 +81,7 @@ function withKnownEvidence(diff: NarrativeDiff, ctx: VerifyContext): NarrativeDi
 function labelEntries(diff: NarrativeDiff, labelling: Labelling, state: SessionState): { entries: Array<{ path: string; proposal: Proposal }>; errors: FieldError[]; withdrawn: string[]; labels: Map<string, Label> } {
   const known = labelling.known ?? labelling.required;
   const { labels, invalid } = readLabels(diff.labels, (ordinal) => known.includes(ordinal));
+  for (const ordinal of labelling.seed ?? []) if (!labels.has(ordinal) && !invalid.has(ordinal)) labels.set(ordinal, { kind: "rule" });
   const errors: FieldError[] = [];
   const withdrawn = earlierLifts(labels, known, state, labelling, errors);
   const bad = (ref: string, detail: string) => errors.push({ path: `labels.${ref}`, rejection: { code: "bad-label", ref, detail }, fixable: true });
@@ -146,7 +153,9 @@ function refuseLift(labels: Map<string, Label>, ordinal: string, target: string,
  */
 function earlierLifts(labels: Map<string, Label>, known: readonly string[], state: SessionState, labelling: Labelling, errors: FieldError[]): string[] {
   const inState = new Set(activeCorrections(state).map((item) => item.quote.ordinal));
-  const earlier = (target: string) => /^u\d+$/.test(target) && !known.includes(target) && !inState.has(target);
+  // A seed rule no label records here is recorded after the diff by the floor, which is what a withdrawal of it stops.
+  const floorOnly = (target: string) => (labelling.seed ?? []).includes(target) && labels.get(target)?.kind !== "rule";
+  const earlier = (target: string) => /^u\d+$/.test(target) && (!known.includes(target) || floorOnly(target)) && !inState.has(target);
   const withdrawn: string[] = [];
   for (const [ordinal, label] of labels) {
     const handled = new Set<string>();

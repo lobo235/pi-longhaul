@@ -162,6 +162,15 @@ test("validateNarrativeDiff: a switchover withdrawal is checked like any lift: a
   assert.deepEqual(result.errors.map((error) => [error.path, error.rejection.code, error.fixable]), [["labels.u2", "bad-label", true]]);
 });
 
+test("validateNarrativeDiff: a switchover's seed rule left unlabeled is recorded in message order, so a later label lifts it; one labeled \"not a rule\" is withdrawn instead", () => {
+  const seeded = { required: ["u3"], known: ["u1", "u3"], seed: ["u1"], textOf: (ordinal: string) => index.textOf(ordinal) };
+  const lifted = validateNarrativeDiff({ ...bare, labels: { u3: "lifts u1" } }, ctx(), seeded);
+  assert.deepEqual(lifted.events.flatMap((event) => (event.kind.startsWith("correction") ? [event.kind] : [])), ["correction.add", "correction.lift"]);
+  assert.deepEqual([lifted.errors, lifted.withdrawn], [[], undefined]);
+  const floorOnly = validateNarrativeDiff({ ...bare, labels: { u1: "not a rule", u3: "lifts u1" } }, ctx(), seeded);
+  assert.deepEqual([floorOnly.errors, floorOnly.withdrawn, floorOnly.events.filter((event) => event.kind.startsWith("correction"))], [[], ["u1"], []]);
+});
+
 test("validateNarrativeDiff: a withdrawal of an earlier message no one offered withdraws nothing", () => {
   const span = { required: ["u3"], known: ["u3"], textOf: (ordinal: string) => (ordinal === "u9" ? undefined : index.textOf(ordinal)) };
   const result = validateNarrativeDiff({ ...bare, labels: { u3: "lifts u9" } }, ctx(), span);

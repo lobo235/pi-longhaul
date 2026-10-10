@@ -56,7 +56,7 @@ test("renderNarrativePrompt: system prompt first (cacheable), then state, ordina
   assert.ok(text.trimEnd().endsWith("</retry-note>"));
   assert.match(NARRATIVE_SYSTEM_PROMPT, /```json/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /"messageRef"/);
-  assert.equal(NARRATIVE_PROMPT_REVISION, "state-13");
+  assert.equal(NARRATIVE_PROMPT_REVISION, "state-14");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: every user message of the span is labeled, in every form the parser reads, whatever words it uses", () => {

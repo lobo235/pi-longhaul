@@ -436,6 +436,42 @@ test("runStatePass: on a switchover the model sees the user's other earlier mess
   assert.deepEqual(result.outcome.rejected, []);
 });
 
+/** A switchover where an earlier rule-shaped message (offered as a seed rule) replaced an earlier plain rule. */
+function switchoverReplacedInput(): PassInput {
+  const earlier = [userEntry("m0", "Indent every file with tabs."), assistantEntry("a0", "understood"), userEntry("m00", "Switch every file to two-space indentation instead of tabs."), assistantEntry("a00", "switched"), compactionEntry("c0", { compactor: "another-compactor" })];
+  const span = branch();
+  const entries = chain([...earlier, ...span]);
+  const messages = span.filter((entry) => entry.type === "message").map((entry) => (entry as { message: AgentMessage }).message);
+  return inputOf(entries, { preparation: { ...inputOf(entries).preparation, messagesToSummarize: messages.slice(0, -1), turnPrefixMessages: messages.slice(-1), previousSummary: "## Constraints\n- two-space indentation" } as never });
+}
+const activeRules = (result: Awaited<ReturnType<typeof runStatePass>>) => {
+  const lifted = new Set(result.pending.events.flatMap((event) => (event.kind === "correction.lift" ? [event.target] : [])));
+  return result.pending.events.flatMap((event) => (event.kind === "correction.add" && !lifted.has(event.id) ? [event.quote.ordinal] : []));
+};
+
+test("runStatePass: on a switchover an earlier rule-shaped message may be labeled, so it can withdraw the rule it replaced", async () => {
+  const result = await runStatePass(switchoverReplacedInput(), answering({ labels: { ...NOT_RULES, u1: "rule", u2: "rule and lifts u1" } }));
+  assert.deepEqual(activeRules(result), ["u2"], "u1 is lifted by u2; u2 stands");
+  assert.deepEqual(result.outcome.rejected, []);
+});
+
+test("runStatePass: on a switchover an earlier rule-shaped message that may replace an earlier rule is asked about, and a yes lifts it", async () => {
+  const deps = withPrompts((prompts) => ({ complete: async (_m: unknown, context: unknown) => {
+    const prompt = (context as { messages: Array<{ content: string }> }).messages[0].content;
+    prompts.push(prompt);
+    if (prompt.includes("<label-question>")) return answer(JSON.stringify({ u2: "rule and lifts u1" })) as never;
+    return answer(JSON.stringify({ narrative: "ran the tests", labels: { ...NOT_RULES, u1: "rule", u2: undefined }, corrections: [], lifts: [], decisions: [], deadEnds: [], now: { inProgress: [], next: [], blocked: [], resume: "go on" } })) as never;
+  } }));
+  const result = await runStatePass(switchoverReplacedInput(), deps);
+  assert.match(deps.prompts.at(-1)!, /u2 is labeled "rule" and may replace the rule u1 gave/);
+  assert.deepEqual(activeRules(result), ["u2"]);
+});
+
+test("runStatePass: on a switchover an earlier rule-shaped message labeled \"not a rule\" is still recorded: only oneOffs drops one", async () => {
+  const result = await runStatePass(switchoverInput(), answering({ labels: { ...NOT_RULES, u1: "not a rule" } }));
+  assert.deepEqual(carried(result), ["u1 never deploy on a friday, whatever the change"]);
+});
+
 /**
  * Longhaul's own compaction judged u1 a one-off; a later compaction fell back to another compactor (pi's own, after a
  * failed pass) over u3, a new rule; then this span. Only the gap since Longhaul's last compaction is a switchover.
