@@ -7,7 +7,8 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
 import { normalizeWs } from "../intent.ts";
-import type { Now, StateEvent } from "../store/events.ts";
+import { quoteText } from "../render.ts";
+import { DEFAULT_CAPS, type Now, type Quote, type StateEvent } from "../store/events.ts";
 import { activeCorrections, activeDeadEnds, activeDecisions, GOAL_SOURCE_LABEL, goalLine, type GoalSource, type SessionState } from "../store/project.ts";
 import { fitFirstChunk } from "./fit.ts";
 import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from "./message-labels.ts";
@@ -118,15 +119,21 @@ const rememberedText = (event: StateEvent): { kind: string; text: string } | und
 };
 
 /** The Goal line as the summarizer sees it; the turns runner shows the same one. */
-function goalOf(state: SessionState): { goal?: PromptState["goal"] } {
+function goalOf(state: SessionState, quoteChars: number): { goal?: PromptState["goal"] } {
   const goal = goalLine(state);
-  return goal ? { goal: { ordinal: goal.quote.ordinal, text: goal.quote.text, source: goal.source } } : {};
+  return goal ? { goal: { ordinal: goal.quote.ordinal, text: quoteText(goal.quote, quoteChars), source: goal.source } } : {};
 }
 
-export function promptStateOf(state: SessionState, remembered: StateEvent[]): PromptState {
+/**
+ * The state as the summarizer sees it. The goal, the Request and its acceptance are cut at `quoteChars` (the
+ * state's own quote cap) as the rendered state cuts them: the goal stays for the session's life, so a pasted first
+ * message must not fill every later prompt. The summarizer answers with message refs, never with these words.
+ */
+export function promptStateOf(state: SessionState, remembered: StateEvent[], quoteChars = DEFAULT_CAPS.objectiveQuoteChars): PromptState {
+  const cut = (quote: Quote) => ({ ordinal: quote.ordinal, text: quoteText(quote, quoteChars) });
   return {
-    ...goalOf(state),
-    objective: state.objective ? { ordinal: state.objective.quote.ordinal, text: state.objective.quote.text, doneWhen: state.objective.doneWhen ? { ordinal: state.objective.doneWhen.ordinal, text: state.objective.doneWhen.text } : undefined } : undefined,
+    ...goalOf(state, quoteChars),
+    objective: state.objective ? { ...cut(state.objective.quote), doneWhen: state.objective.doneWhen ? cut(state.objective.doneWhen) : undefined } : undefined,
     corrections: activeCorrections(state).map((item) => ({ id: item.id, ordinal: item.quote.ordinal, text: item.quote.text, lifted: item.liftedBy?.ordinal })),
     decisions: activeDecisions(state).map((item) => ({ id: item.id, text: item.text })),
     deadEnds: activeDeadEnds(state).map((item) => ({ id: item.id, text: item.text })),

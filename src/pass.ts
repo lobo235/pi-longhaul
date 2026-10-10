@@ -287,7 +287,7 @@ function narrativeInputOf(input: PassInput, fold: Fold, config: StateConfig, dep
     userTextOf: (ordinal) => fold.index.textOf(ordinal),
     span: fold.spanInput,
     state,
-    promptState: { ...promptStateOf(state, acceptedRemembers(fold.log, fold.span)), ...fold.seed },
+    promptState: { ...promptStateOf(state, acceptedRemembers(fold.log, fold.span), config.caps.objectiveQuoteChars), ...fold.seed },
     verify: { resolver: fold.index, provenance: { source: "diff", span: fold.span, at }, caps: config.caps, nearDuplicateThreshold: config.nearDuplicateThreshold, acceptedThisSpan: 0, rememberCap: 0 },
     customInstructions: input.customInstructions,
     model: fold.resolved?.model,

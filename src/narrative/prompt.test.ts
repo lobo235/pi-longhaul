@@ -39,6 +39,16 @@ test("promptStateOf: outside a /goal the opening request is the goal line once t
   assert.match(text, /\ngoal: \[u1\] build logstat, an access-log summarizer \(the session's opening request; kept by code\)\nobjective: \[u6\] add a --top option\n/);
 });
 
+test("promptStateOf: the goal and the Request are cut at the quote cap with the recall pointer, so a pasted first message cannot fill every later prompt", () => {
+  const pasted = "summarize this log: " + "x".repeat(5000);
+  const log = logOf(ev({ kind: "objective.set", quote: quote("u1", pasted) }), closeEvent(1), ev({ kind: "objective.set", quote: quote("u6", "y".repeat(900)), span: 2 }), closeEvent(2));
+  const state = promptStateOf(project(log, DEFAULT_CAPS), [], 600);
+  assert.equal(state.goal!.text, pasted.slice(0, 599) + "… (longhaul_recall message u1)");
+  assert.equal(state.objective!.text, "y".repeat(599) + "… (longhaul_recall message u6)");
+  const text = renderNarrativePrompt({ state, ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
+  assert.ok(!text.includes("x".repeat(600)), "the paste is not in the prompt whole");
+});
+
 test("planChunks: one chunk when it fits, several capped chunks when it does not, truncated past maxChunks", () => {
   const messages = Array.from({ length: 20 }, (_, i) => (i % 2 ? assistant("y".repeat(3000), i) : user("x".repeat(3000), i)));
   const one = planChunks({ messages: messages.slice(0, 2), fixedChars: 1000, outputBudget: 1000, contextWindow: 131072, maxChunks: 4 });

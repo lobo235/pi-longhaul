@@ -53,10 +53,14 @@ export const RECALL_HINT = `${RECALL_TOOL}: span N | commands <pattern> | errors
  */
 export const stripControls = (text: string): string => text.replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, "");
 
-export function renderQuote(quote: Quote, max: number): string {
+/** A quote's words on one line, cut at `max` with a pointer to recall the whole message. */
+export function quoteText(quote: Quote, max: number): string {
   const text = oneLine(quote.text);
-  if (text.length <= max) return `"${text}"`;
-  return `"${text.slice(0, max - 1)}… (${RECALL_TOOL} message ${quote.ordinal})"`;
+  return text.length <= max ? text : `${text.slice(0, max - 1)}… (${RECALL_TOOL} message ${quote.ordinal})`;
+}
+
+export function renderQuote(quote: Quote, max: number): string {
+  return `"${quoteText(quote, max)}"`;
 }
 
 function tokensLabel(tokens: number): string {
