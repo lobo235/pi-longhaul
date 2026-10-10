@@ -334,13 +334,13 @@ newest pi and opens an issue when it breaks.
 
 ## Roadmap
 
-Each item is a GitHub issue labelled `roadmap`; there are no dates.
+Each item is a GitHub issue labelled [`roadmap`](https://github.com/lobo235/pi-longhaul/issues?q=is%3Aissue+label%3Aroadmap); there are no dates.
 
-- Summarize from the session's own warm request (prefix-cache reuse), pending a way to repeat pi's request.
-- Carry more of the values a session will need again, where pi's own summary does better today.
-- Caps that scale with the context window.
-- `turns` mode as a tested, gated option.
-- A project-level config limited to harmless keys.
+- [Summarize from the session's own warm request](https://github.com/lobo235/pi-longhaul/issues/6) (prefix-cache reuse), pending a way to repeat pi's request.
+- [Carry more of the values a session will need again](https://github.com/lobo235/pi-longhaul/issues/7), where pi's own summary does better today.
+- [Caps that scale with the context window](https://github.com/lobo235/pi-longhaul/issues/8).
+- [`turns` mode as a tested, gated option](https://github.com/lobo235/pi-longhaul/issues/9).
+- [A project-level config limited to harmless keys](https://github.com/lobo235/pi-longhaul/issues/10).
 
 ## Versioning
 
