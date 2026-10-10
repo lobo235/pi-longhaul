@@ -32,8 +32,8 @@ Longhaul replaces that summary with a **Session state** that is carried forward 
 Whether this gives better sessions than pi's own compaction is measured, not assumed. On the published
 synthetic sessions with a local 27B reasoning model, Longhaul kept 226 of 227 labeled user rules in force
 against pi's 211, and all 9 labeled values against 7, at about a fifth of the compaction time and output
-tokens. pi's own summary carried more identifiers read from source files, and Longhaul does worse when it takes
-over a session pi has already compacted. [docs/evaluation.md](docs/evaluation.md) has the method and every
+tokens. pi's own summary carried more identifiers read from source files, and when Longhaul takes over a session
+pi has already compacted it keeps fewer of the values pi's summary carried. [docs/evaluation.md](docs/evaluation.md) has the method and every
 measure, including where pi's own does better.
 
 ## What the state looks like
