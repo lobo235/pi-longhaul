@@ -32,8 +32,22 @@ export function resolveLogPath(envValue: string | undefined, defaultPath: string
 
 const PRIVATE_FILE = 0o600;
 
-/** Never follow a symlink; never block on a FIFO with no reader (ENXIO instead). */
-const SAFE_OPEN = fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
+/**
+ * Never follow a symlink; never block on a FIFO with no reader (ENXIO instead). Windows has neither flag, so there
+ * a symlink is refused by `lstat` before the open: a symlink planted between the two calls is followed (security.md T6).
+ */
+const NO_FOLLOW = fs.constants.O_NOFOLLOW ?? 0;
+const SAFE_OPEN = NO_FOLLOW | (fs.constants.O_NONBLOCK ?? 0);
+
+/** Whether `logPath` is a symlink, where the open cannot refuse one itself. */
+function symlinkWithoutNoFollow(logPath: string): boolean {
+  if (NO_FOLLOW) return false;
+  try {
+    return fs.lstatSync(logPath).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Make a log directory this user owns readable by its owner only. Meant for the default directory, which is
@@ -51,6 +65,7 @@ export function privateLogDir(dir: string): void {
 
 /** Run `use` on `logPath` opened with `flags`, only if it is a regular file; otherwise do nothing. */
 export function withRegularFile(logPath: string, flags: number, use: (fd: number, stat: fs.Stats) => void): void {
+  if (symlinkWithoutNoFollow(logPath)) return;
   const fd = fs.openSync(logPath, flags | SAFE_OPEN, PRIVATE_FILE);
   try {
     const stat = fs.fstatSync(fd);

@@ -264,7 +264,8 @@ test("captureWorkspace with a real git: a filter driver planted in .git/config n
   assert.equal(fs.existsSync(marker), false, "the planted filter ran");
 
   await git("config", "--unset", "filter.planted.clean");
-  fs.writeFileSync(globalConfig, `[filter "planted"]\n\tclean = touch '${marker}'; cat\n`);
+  // Forward slashes: a backslash starts an escape in a config file, so a Windows path written raw breaks it.
+  fs.writeFileSync(globalConfig, `[filter "planted"]\n\tclean = touch '${marker.replaceAll("\\", "/")}'; cat\n`);
   const trusted = await captureWorkspace({ exec, cwd: repo, commands: [] });
   assert.ok("snapshot" in trusted, JSON.stringify(trusted));
   assert.match(trusted.snapshot.statusShort ?? "", /a\.txt/);

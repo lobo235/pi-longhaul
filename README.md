@@ -86,7 +86,8 @@ Requirements:
   per session (see *pi versions*).
 - Node.js 22.19 or newer (pi's own requirement).
 - A model with a context window of at least 32k tokens. Longhaul warns once per session below that.
-- Linux or macOS. Windows runs in CI but is not supported yet; issues are welcome.
+- Linux, macOS or Windows. The tests gate a release on all three; the compaction smoke (a real pi) runs on Linux
+  and macOS only. On Windows the log relies on your profile's permissions, which have no `0600` (`docs/security.md` T6).
 - git 2.26 or newer for the workspace snapshot (branch, tree, last test). Without it the snapshot is skipped and
   the rest of the state is unaffected. A repository whose own git config defines a filter driver is skipped as
   well, so a checkout you did not make cannot run a program through it, and so is a partial clone
@@ -188,7 +189,7 @@ example a cheaper one, without letting that route reach sessions you did not mea
 |---|---|---|
 | `model` | unset | `provider/model-id` of the summarizer route |
 | `routeProviders` | `[]` | providers, by exact name, whose sessions may use the route. Every other session summarizes on its own model, so a session on a provider you did not list never has its conversation sent to the route. Set `model` alone and nothing is routed. |
-| `localOnlyRoots` | `[]` | directories (absolute, or `~/...`) whose sessions, and their subdirectories', never use the route, whatever else is set. For work whose content must not leave the machine through a summarizer. An entry that cannot match (a relative path, say) is named in a warning. |
+| `localOnlyRoots` | `[]` | directories (absolute, or `~/...`; on Windows `C:\...` or `~\...` too, matched without case) whose sessions, and their subdirectories', never use the route, whatever else is set. For work whose content must not leave the machine through a summarizer. An entry that cannot match (a relative path, say) is named in a warning. |
 
 `PI_COMPACT_STATE_MODEL=provider/model-id` overrides all three for one pi invocation: that invocation's
 sessions summarize on it whatever their provider and wherever they run. It is for a deliberate one-off, not a
@@ -327,8 +328,9 @@ newest pi and opens an issue when it breaks.
   pi-goal; without it, the Objective falls back to your first substantial message.
 - **Models that cannot turn reasoning off cost more** per compaction (see *Cost*).
 - **Context windows under 32k tokens are not supported.** The state's caps do not scale down yet.
-- **Google's APIs are untested, and Windows is not supported yet** (CI runs it, but its result does not gate a
-  release). On Google, most models cannot turn reasoning off.
+- **Google's APIs are untested.** On Google, most models cannot turn reasoning off.
+- **Windows has no compaction smoke in CI**: its tests gate a release, but a real pi compaction is only exercised on
+  Linux and macOS.
 - **A child pi started with `--no-extensions`** compacts with pi's own compaction.
 - **An unverified pi** warns, and a compaction that fails on it falls back to pi's own.
 
@@ -341,7 +343,6 @@ Each item is a GitHub issue labelled `roadmap`; there are no dates.
 - Caps that scale with the context window.
 - `turns` mode as a tested, gated option.
 - A project-level config limited to harmless keys.
-- Windows paths.
 
 ## Versioning
 

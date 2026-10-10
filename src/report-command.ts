@@ -9,6 +9,7 @@ import { getAgentDir, VERSION as PI_VERSION, type ExtensionAPI } from "@earendil
 
 import { readConfigFile, resolveStateConfig } from "./config.ts";
 import { defaultLogPath, resolveLogPath, withRegularFile } from "./log.ts";
+import { homeDirectory } from "./narrative/route-config.ts";
 import type { PiVersionStatus } from "./pi-compat.ts";
 import { buildReport, readLastRecords } from "./report.ts";
 
@@ -46,7 +47,7 @@ export function registerReportCommand(pi: ExtensionAPI, piStatus: PiVersionStatu
   pi.registerCommand(REPORT_COMMAND, {
     description: "Write a bug-report digest (versions, model shape, config keys, newest log records) to a private file",
     handler: async (_args, ctx) => {
-      const home = process.env.HOME;
+      const home = homeDirectory();
       const file = path.join(getAgentDir(), "logs", "longhaul-report.md");
       try {
         const text = readConfigFile();

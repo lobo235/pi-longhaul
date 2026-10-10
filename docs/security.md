@@ -280,6 +280,9 @@ A transcript or a model answer can be arbitrarily long, and a compaction runs in
 - The log and the report are created `0600` in a `0700` directory, tightened on every write, and never written
   through a symlink or into anything that is not a regular file (a FIFO is never blocked on, a device never
   re-moded). An existing directory is tightened only when the current user owns it.
+- Windows has no POSIX modes and no `O_NOFOLLOW`: there the log and the report rely on the user profile's
+  permissions, and a symlink at the log path is refused by `lstat` before the file is opened, so one planted in
+  the moment between the two is followed.
 
 ### T7. Untrusted numbers from providers
 

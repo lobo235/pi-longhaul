@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import path from "node:path";
+
 import { foreignCompactionNotice, localOnlyRootsNotice, MIN_CONTEXT_WINDOW, smallWindowNotice } from "./notices.ts";
 
 for (const [name, details, fromExtension, expected] of [
@@ -36,7 +38,7 @@ for (const [name, roots, home, expected] of [
   ["a relative path is named", ["dev/secret"], "/home/agent", /"dev\/secret" .*not an absolute POSIX path/],
   ["a home-relative root with no HOME is named", ["~/dev/x"], undefined, /"~\/dev\/x" .*HOME is not set/],
 ] as const) test(`localOnlyRootsNotice: ${name}`, () => {
-  const notice = localOnlyRootsNotice(roots, home);
+  const notice = localOnlyRootsNotice(roots, home, path.posix);
   if (expected === undefined) assert.equal(notice, undefined);
   else {
     assert.match(notice ?? "", expected);
@@ -45,8 +47,15 @@ for (const [name, roots, home, expected] of [
 });
 
 test("localOnlyRootsNotice: every unusable entry is named in one notice", () => {
-  const notice = localOnlyRootsNotice(["a", "/ok", "b"], "/home/agent") ?? "";
+  const notice = localOnlyRootsNotice(["a", "/ok", "b"], "/home/agent", path.posix) ?? "";
   assert.match(notice, /"a"/);
   assert.match(notice, /"b"/);
   assert.doesNotMatch(notice, /"\/ok"/);
+});
+
+test("localOnlyRootsNotice: on Windows a drive path is usable, a POSIX one is named, and the advice gives a drive path", () => {
+  assert.equal(localOnlyRootsNotice(["C:\\work\\secret", "~\\dev"], "C:\\Users\\agent", path.win32), undefined);
+  const notice = localOnlyRootsNotice(["/srv/x"], "C:\\Users\\agent", path.win32) ?? "";
+  assert.match(notice, /"\/srv\/x" \(it is not an absolute path/);
+  assert.match(notice, /Use an absolute path \(C:\\\.\.\.\)/);
 });

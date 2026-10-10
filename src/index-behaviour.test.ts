@@ -122,8 +122,10 @@ test("a fallback is logged as its error class and a short message, no stack, in 
     const fallback = records.find((record) => record.event === "fallback");
     assert.equal(fallback.errorClass, "TypeError");
     assert.equal(fallback.stack, undefined);
-    assert.equal(fs.statSync(logFile).mode & 0o777, 0o600);
-    assert.equal(fs.statSync(path.dirname(logFile)).mode & 0o777, 0o700);
+    if (process.platform !== "win32") { // Windows has no POSIX modes (security.md T6)
+      assert.equal(fs.statSync(logFile).mode & 0o777, 0o600);
+      assert.equal(fs.statSync(path.dirname(logFile)).mode & 0o777, 0o700);
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -298,7 +300,7 @@ test("/longhaul-report writes a private report next to the log and names it; the
     await command.handler("", ctx);
     const file = path.join(agentDir, "logs", "longhaul-report.md");
     const report = fs.readFileSync(file, "utf8");
-    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+    if (process.platform !== "win32") assert.equal(fs.statSync(file).mode & 0o777, 0o600); // no POSIX modes on Windows (security.md T6)
     const version = (JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
     assert.ok(report.includes(`Longhaul ${version}`));
     assert.ok(report.includes('"span":4') && report.includes("narrativeMode: turns"));

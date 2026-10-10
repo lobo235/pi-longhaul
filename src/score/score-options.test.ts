@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 
 import { scoreOptionsOf } from "./score-options.ts";
@@ -13,7 +14,8 @@ test("scoreOptionsOf: defaults are the state arm against pi's own, ten compactio
   assert.equal(options.sessions, "/data/synthetic");
   assert.equal(options.n, 10);
   assert.deepEqual(options.caps, [8000, 12000, 16000]);
-  assert.match(options.out, /^\/repo\/score-out\/\d{4}-/);
+  assert.equal(path.dirname(options.out), path.join("/repo", "score-out"));
+  assert.match(path.basename(options.out), /^\d{4}-/);
   assert.equal(options.probe, false);
   assert.equal(options.warmPrime, true);
   assert.equal(options.includeLocalOnly, false);
