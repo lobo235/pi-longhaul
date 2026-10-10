@@ -82,8 +82,8 @@ function warnUnusableRoots(rt: Runtime, ctx: Notify, config: StateConfig): void 
 }
 
 /** `piVersion` is for tests: pi passes only `pi`, and the running pi is the one Longhaul is checked against. */
-export default function compactionStateExtension(pi: ExtensionAPI, options: { piVersion?: string } = {}) {
-  const piVersion = options.piVersion ?? PI_VERSION;
+export default function compactionStateExtension(pi: ExtensionAPI, options?: { piVersion?: string } | null) {
+  const piVersion = options?.piVersion ?? PI_VERSION;
   // The marker a compactor that defers to Longhaul reads (select.ts): set at LOAD, which is earlier
   // than session_start and strictly safer -- no compaction can precede the load, and a
   // factory re-invoked per session sets it again harmlessly. The value is this process's pid, so a
