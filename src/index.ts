@@ -13,6 +13,7 @@ import { buildSpanRecord } from "./cold.ts";
 import { compactionLineFor, LINE_ENTRY_TYPE, renderCompactionLine } from "./compaction-line.ts";
 import { appendJsonl, defaultLogPath, privateLogDir, resolveLogPath } from "./log.ts";
 import { registryCall } from "./narrative/call.ts";
+import { homeDirectory } from "./narrative/route-config.ts";
 import { withSummarizerHeaders } from "./narrative/summarizer-headers.ts";
 import { createRouteHealth, type RouteHealthState } from "./narrative/route-health.ts";
 import { resolveStateConfig, warmModeNotice, type StateConfig } from "./config.ts";
@@ -76,7 +77,7 @@ function warnOnce(rt: Runtime, ctx: Notify, key: string, text: string | undefine
 
 // Keyed by the text, so an entry added mid-session is named at the next compaction, and each wording once.
 function warnUnusableRoots(rt: Runtime, ctx: Notify, config: StateConfig): void {
-  const notice = localOnlyRootsNotice(config.localOnlyRoots, process.env.HOME);
+  const notice = localOnlyRootsNotice(config.localOnlyRoots, homeDirectory());
   warnOnce(rt, ctx, `local-only-roots:${notice}`, notice);
 }
 

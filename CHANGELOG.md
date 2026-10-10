@@ -12,6 +12,9 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 - The State compactor as a standalone pi package: a verified Session state carried across
   compactions instead of a rewritten summary, with the `longhaul_remember` and `longhaul_recall` tools.
+- Windows: `localOnlyRoots` takes Windows paths (`C:\...`, `\\server\share\...`, `~\...`), matched by Windows
+  rules (either separator, no case, never across drives); `~` is the user profile there. The log refuses a
+  symlink by `lstat` where the open cannot, and the tests gate a release on Windows as on Linux and macOS.
 - `longhaul.json` in pi's agent dir, read fresh at every compaction: `routeProviders`, `localOnlyRoots`,
   `summarizerHeaders` and `keptWindowThinking`, beside the caps and policy keys.
 - The summarizer labels every user message of the span (`rule`, `not a rule`, `lifts R<n>`, `rule and lifts

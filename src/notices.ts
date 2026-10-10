@@ -2,7 +2,9 @@
  * Once-per-session warnings about a setup Longhaul cannot fix on its own. Each returns the notice
  * text, or undefined when there is nothing to say; index.ts decides when, and remembers it said it.
  */
-import { unusableLocalOnlyRoot } from "./narrative/route-config.ts";
+import path from "node:path";
+
+import { unusableLocalOnlyRoot, type PathRules } from "./narrative/route-config.ts";
 
 /**
  * A compaction landed that Longhaul did not make. pi runs every `session_before_compact` handler --
@@ -35,11 +37,11 @@ export function smallWindowNotice(model: { provider: string; id: string; context
  * `unusableLocalOnlyRoot`). Such an entry would otherwise be skipped without a word, and the project it was meant
  * to keep on this machine would route like any other.
  */
-export function localOnlyRootsNotice(roots: readonly string[], home: string | undefined): string | undefined {
+export function localOnlyRootsNotice(roots: readonly string[], home: string | undefined, rules: PathRules = path): string | undefined {
   const unusable = roots.flatMap((root) => {
-    const reason = unusableLocalOnlyRoot(root, home);
+    const reason = unusableLocalOnlyRoot(root, home, rules);
     return reason ? [`"${root}" (${reason})`] : [];
   });
   if (unusable.length === 0) return undefined;
-  return `longhaul: localOnlyRoots ${unusable.length === 1 ? "entry" : "entries"} ${unusable.join(", ")} cannot match any directory, so sessions there may be summarized off this machine. Use an absolute path (/...) or ~/... in longhaul.json.`;
+  return `longhaul: localOnlyRoots ${unusable.length === 1 ? "entry" : "entries"} ${unusable.join(", ")} cannot match any directory, so sessions there may be summarized off this machine. Use an absolute path (${rules.sep === "\\" ? "C:\\..." : "/..."}) or ~/... in longhaul.json.`;
 }

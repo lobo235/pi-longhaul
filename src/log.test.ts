@@ -12,6 +12,9 @@ function scratch(): string {
 }
 
 const mode = (file: string) => fs.statSync(file).mode & 0o777;
+/** Windows has no POSIX modes, owners or FIFOs: a test about only those is skipped there, and mode checks are POSIX-only. */
+const WINDOWS = process.platform === "win32";
+const posixOnly = { skip: WINDOWS ? "Windows has no POSIX file modes, owners or FIFOs" : false };
 
 test("appendJsonl: a log written under a looser mode is 0600 after the next write, and so is the backup a rotation makes of it", () => {
   const dir = scratch();
@@ -20,8 +23,11 @@ test("appendJsonl: a log written under a looser mode is 0600 after the next writ
     fs.writeFileSync(logPath, "x".repeat(LOG_MAX_BYTES + 1), { mode: 0o664 });
     fs.chmodSync(logPath, 0o664);
     appendJsonl(logPath, { event: "after-rotation" });
-    assert.equal(mode(`${logPath}.1`), 0o600);
-    assert.equal(mode(logPath), 0o600);
+    if (!WINDOWS) {
+      assert.equal(mode(`${logPath}.1`), 0o600);
+      assert.equal(mode(logPath), 0o600);
+    }
+    assert.ok(fs.statSync(`${logPath}.1`).size > LOG_MAX_BYTES, "the backup is the rotated log");
     assert.match(fs.readFileSync(logPath, "utf8"), /"event":"after-rotation"/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -38,13 +44,13 @@ test("appendJsonl: a symlink at the log path is not followed; nothing is written
     fs.symlinkSync(target, logPath);
     appendJsonl(logPath, { event: "planted" });
     assert.equal(fs.readFileSync(target, "utf8"), "untouched\n");
-    assert.equal(mode(target), 0o644);
+    if (!WINDOWS) assert.equal(mode(target), 0o644);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("appendJsonl: a directory it creates is 0700; an existing directory the user chose keeps its mode", () => {
+test("appendJsonl: a directory it creates is 0700; an existing directory the user chose keeps its mode", posixOnly, () => {
   const dir = scratch();
   try {
     appendJsonl(path.join(dir, "new", "state.jsonl"), { event: "first" });
@@ -58,7 +64,7 @@ test("appendJsonl: a directory it creates is 0700; an existing directory the use
   }
 });
 
-test("privateLogDir: a directory this user owns is made 0700; a missing one is left alone", () => {
+test("privateLogDir: a directory this user owns is made 0700; a missing one is left alone", posixOnly, () => {
   const dir = scratch();
   try {
     fs.chmodSync(dir, 0o775);
@@ -70,7 +76,7 @@ test("privateLogDir: a directory this user owns is made 0700; a missing one is l
   }
 });
 
-test("privateLogDir: a symlinked log directory is the user's and keeps its target's mode", () => {
+test("privateLogDir: a symlinked log directory is the user's and keeps its target's mode", posixOnly, () => {
   const dir = scratch();
   try {
     const shared = path.join(dir, "shared");
@@ -85,7 +91,7 @@ test("privateLogDir: a symlinked log directory is the user's and keeps its targe
 });
 
 // Never pass a real system path here: privateLogDir chmods, and as root every directory is "owned".
-test("privateLogDir: a directory another user owns is left alone", { skip: process.getuid?.() === 0 ? "running as root" : false }, () => {
+test("privateLogDir: a directory another user owns is left alone", { skip: WINDOWS ? posixOnly.skip : process.getuid?.() === 0 ? "running as root" : false }, () => {
   const foreign = ["/usr", "/etc", "/"].find((candidate) => fs.statSync(candidate).uid !== process.getuid?.());
   if (!foreign) return;
   const before = mode(foreign);
@@ -93,7 +99,7 @@ test("privateLogDir: a directory another user owns is left alone", { skip: proce
   assert.equal(mode(foreign), before);
 });
 
-test("appendJsonl: a log path that is not a regular file is neither blocked on, re-moded nor written", () => {
+test("appendJsonl: a log path that is not a regular file is neither blocked on, re-moded nor written", posixOnly, () => {
   const dir = scratch();
   try {
     const fifo = path.join(dir, "state.jsonl");

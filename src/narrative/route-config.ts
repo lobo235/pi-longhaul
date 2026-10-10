@@ -4,7 +4,8 @@
  * invocation); a session under a Local-only root ignores the config's route. No route ships.
  */
 import { realpathSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { homedir } from "node:os";
+import path from "node:path";
 
 import { bounded } from "./policy.ts";
 import { DEFAULT_ROUTE_HEALTH, type RouteHealthConfig } from "./route-health.ts";
@@ -57,28 +58,45 @@ export function routeProvidersFor(route: ResolvedSummarizationRoute, routeProvid
   return route.rule === "env-override" ? [...routeProviders, sessionProvider] : routeProviders;
 }
 
+/** The path rules a root is read by: the host's own (`node:path`), or `path.win32` / `path.posix` in a test. */
+export type PathRules = typeof path.posix;
+type Realpath = (p: string) => string;
+
+/** The user's home directory: `HOME` on Unix, the user profile on Windows (`os.homedir`); undefined when there is none. */
+export function homeDirectory(): string | undefined {
+  try {
+    return homedir() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The Local-only root (CONTEXT.md) `cwd` works under, or undefined. A root is the Longhaul config's
  * `localOnlyRoots` entry: a session working in a project's subdirectory is still that project, so a
- * root matches itself and everything beneath it. `~` expands with `home`, and the boundary is a path
- * separator, so `~/dev/notes-2` is NOT `~/dev/notes`. Both sides are canonicalized before the comparison
- * (`fs.realpathSync`, falling back to the deepest existing ancestor for a path that does not exist
- * yet): a string test alone lets a symlink under a root, or a `..` segment inside one, read as
- * local-only while resolving outside it (security.md T5). The value returned is `~`-expanded, not the real path.
+ * root matches itself and everything beneath it. `~` expands with `home`, and "beneath" is decided by
+ * the platform's path rules (`path.relative`: a separator boundary, so `~/dev/notes-2` is NOT
+ * `~/dev/notes`; on Windows either separator, no case, and never across drives). Both sides are
+ * canonicalized before the comparison (`fs.realpathSync`, falling back to the deepest existing ancestor
+ * for a path that does not exist yet): a string test alone lets a symlink under a root, or a `..`
+ * segment inside one, read as local-only while resolving outside it (security.md T5). The value returned
+ * is `~`-expanded, not the real path.
  */
 export function localOnlyRootOf(
   cwd: string | undefined,
   roots: readonly string[],
-  home: string | undefined = process.env.HOME,
+  home: string | undefined = homeDirectory(),
+  rules: PathRules = path,
+  realpath: Realpath = realpathSync,
 ): string | undefined {
-  const raw = cwd?.trim().replace(/\/+$/, "");
+  const raw = cwd?.trim();
   if (!raw) return undefined;
-  const target = canonical(raw);
+  const target = canonical(raw, rules, realpath);
   for (const root of roots) {
-    const expanded = expandRoot(root, home);
+    const expanded = expandRoot(root, home, rules);
     if (!expanded) continue;
-    const realRoot = canonical(expanded);
-    if (target === realRoot || target.startsWith(`${realRoot}/`)) return expanded;
+    const relative = rules.relative(canonical(expanded, rules, realpath), target);
+    if (relative === "" || (relative !== ".." && !relative.startsWith(`..${rules.sep}`) && !rules.isAbsolute(relative))) return expanded;
   }
   return undefined;
 }
@@ -89,42 +107,59 @@ export function localOnlyRootOf(
  * leaves a symlinked component in place, so `root/link/sub` (where nothing exists below the link)
  * would still read as under `root` while resolving outside it -- the exact escape this guards against.
  */
-function canonical(p: string): string {
+function canonical(p: string, rules: PathRules, realpath: Realpath): string {
   let head = p;
   const tail: string[] = [];
   for (;;) {
     try {
-      const real = realpathSync(head);
-      return tail.length ? resolve(real, ...tail.reverse()) : real;
+      const real = realpath(head);
+      return tail.length ? rules.resolve(real, ...tail.reverse()) : real;
     } catch {
-      const parent = dirname(head);
-      if (parent === head) return resolve(p);
-      tail.push(basename(head));
+      const parent = rules.dirname(head);
+      if (parent === head) return rules.resolve(p);
+      tail.push(rules.basename(head));
       head = parent;
     }
   }
 }
 
-/**
- * Why a `localOnlyRoots` entry protects nothing, or undefined when it is usable. Only an absolute POSIX
- * path (`/...`) or a home-relative one (`~` or `~/...`, with a home to expand it against) can match a
- * session's directory; anything else -- a relative path, a Windows path -- would be silently skipped.
- */
-export function unusableLocalOnlyRoot(root: string, home: string | undefined): string | undefined {
-  const trimmed = root.trim();
-  if (trimmed === "~" || trimmed.startsWith("~/")) return home?.replace(/\/+$/, "") ? undefined : "HOME is not set, so ~ cannot be expanded";
-  return trimmed.startsWith("/") ? undefined : "it is not an absolute POSIX path (/... or ~/...)";
+const isWindows = (rules: PathRules) => rules.sep === "\\";
+/** `~` alone or followed by a separator: `~/` everywhere, `~\` on Windows too. */
+const homeRelative = (root: string, rules: PathRules) => (isWindows(rules) ? /^~(?:$|[\\/])/ : /^~(?:$|\/)/).test(root);
+/** `p` without trailing separators, never cut below its root (`/`, `C:\`). */
+function withoutTrailingSeparators(p: string, rules: PathRules): string {
+  const separator = isWindows(rules) ? /[\\/]$/ : /\/$/;
+  const rootLength = rules.parse(p).root.length;
+  let end = p.length;
+  while (end > rootLength && separator.test(p.slice(0, end))) end--;
+  return p.slice(0, end);
 }
 
-function expandRoot(root: string, home: string | undefined): string | undefined {
-  const trimmed = root.trim().replace(/\/+$/, "");
+/**
+ * Why a `localOnlyRoots` entry protects nothing, or undefined when it is usable. Only an absolute path by
+ * the platform's rules (`/...`; on Windows `C:\...` or `\\server\share\...`) or a home-relative one
+ * (`~`, `~/...`, on Windows `~\...` too, with a home to expand it against) can match a session's
+ * directory; anything else -- a relative path, a path of the other platform -- would be silently skipped.
+ */
+export function unusableLocalOnlyRoot(root: string, home: string | undefined, rules: PathRules = path): string | undefined {
+  const trimmed = root.trim();
+  if (homeRelative(trimmed, rules)) return home?.trim() ? undefined : isWindows(rules) ? "no home directory is known, so ~ cannot be expanded" : "HOME is not set, so ~ cannot be expanded";
+  if (isAbsoluteRoot(trimmed, rules)) return undefined;
+  return isWindows(rules) ? "it is not an absolute path (C:\\... or ~\\...)" : "it is not an absolute POSIX path (/... or ~/...)";
+}
+
+/** Absolute by the platform's rules, with a drive or share on Windows: `\\notes` would resolve against whatever drive is current. */
+const isAbsoluteRoot = (p: string, rules: PathRules) => rules.isAbsolute(p) && (!isWindows(rules) || /^(?:[A-Za-z]:|[\\/]{2})/.test(p));
+
+function expandRoot(root: string, home: string | undefined, rules: PathRules): string | undefined {
+  const trimmed = root.trim();
   if (!trimmed) return undefined;
-  if (trimmed === "~" || trimmed.startsWith("~/")) {
-    const base = home?.replace(/\/+$/, "");
+  if (homeRelative(trimmed, rules)) {
+    const base = home?.trim();
     if (!base) return undefined;
-    return `${base}${trimmed.slice(1)}`;
+    return withoutTrailingSeparators(`${withoutTrailingSeparators(base, rules)}${trimmed.slice(1)}`, rules);
   }
-  return trimmed.startsWith("/") ? trimmed : undefined;
+  return isAbsoluteRoot(trimmed, rules) ? withoutTrailingSeparators(trimmed, rules) : undefined;
 }
 
 /**
@@ -144,7 +179,7 @@ export function resolveSummarizationRoute(input: {
 }): ResolvedSummarizationRoute {
   const fromEnv = input.envSpec?.trim();
   if (fromEnv) return { spec: fromEnv, rule: "env-override" };
-  const localOnlyRoot = localOnlyRootOf(input.cwd, input.localOnlyRoots, input.home ?? process.env.HOME);
+  const localOnlyRoot = localOnlyRootOf(input.cwd, input.localOnlyRoots, input.home ?? homeDirectory());
   if (localOnlyRoot) return { spec: undefined, rule: "local-only", localOnlyRoot };
   const fromConfig = input.configSpec?.trim();
   if (fromConfig) return { spec: fromConfig, rule: "config" };

@@ -9,10 +9,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import path, { join } from "node:path";
 
 import {
   localOnlyRootOf,
+  unusableLocalOnlyRoot,
   resolveConfiguredRouteHealth,
   resolveSummarizationRoute,
   routeProvidersFor,
@@ -221,4 +222,44 @@ for (const [name, rule, expected] of [
   ["a local-only session keeps routeProviders as they are", "local-only", ["listed"]],
 ] as const) test(`routeProvidersFor: ${name}`, () => {
   assert.deepEqual(routeProvidersFor({ spec: "p/m", rule }, ["listed"], "session"), expected);
+});
+
+// --- Windows paths, matched by Windows rules (path.win32), whatever the host -----------------------
+
+const WIN_HOME = "C:\\Users\\agent";
+/** No path exists on this host by its Windows spelling: the matcher falls back to the path as resolved. */
+const noRealpath = (p: string): string => { throw Object.assign(new Error(`ENOENT: ${p}`), { code: "ENOENT" }); };
+
+test("Windows: a drive or home-relative root pins itself and what is beneath it, by either separator and any case", () => {
+  const roots = ["C:\\work\\notes", "~\\dev\\private", "~/dev/mixed"];
+  const pin = (cwd: string) => localOnlyRootOf(cwd, roots, WIN_HOME, path.win32, noRealpath);
+  assert.equal(pin("C:\\work\\notes"), "C:\\work\\notes");
+  assert.equal(pin("C:\\work\\notes\\sub\\deeper"), "C:\\work\\notes");
+  assert.equal(pin("c:\\WORK\\Notes\\sub"), "C:\\work\\notes", "Windows paths compare without case");
+  assert.equal(pin("C:/work/notes/sub"), "C:\\work\\notes", "a forward slash is a separator on Windows");
+  assert.equal(pin("C:\\Users\\agent\\dev\\private\\x"), "C:\\Users\\agent\\dev\\private");
+  assert.equal(pin("C:\\Users\\agent\\dev\\mixed\\x"), "C:\\Users\\agent/dev/mixed");
+});
+
+test("Windows: a sibling, a parent, another drive and a .. escape are not pinned", () => {
+  const pin = (cwd: string) => localOnlyRootOf(cwd, ["C:\\work\\notes"], WIN_HOME, path.win32, noRealpath);
+  assert.equal(pin("C:\\work\\notes-2"), undefined);
+  assert.equal(pin("C:\\work"), undefined);
+  assert.equal(pin("D:\\work\\notes"), undefined);
+  assert.equal(pin("C:\\work\\notes\\..\\outside"), undefined);
+});
+
+test("Windows: a drive or UNC root is usable, a relative or drive-relative one is named", () => {
+  assert.equal(unusableLocalOnlyRoot("C:\\work\\notes", WIN_HOME, path.win32), undefined);
+  assert.equal(unusableLocalOnlyRoot("\\\\server\\share\\notes", WIN_HOME, path.win32), undefined);
+  assert.equal(unusableLocalOnlyRoot("~\\dev", WIN_HOME, path.win32), undefined);
+  assert.match(unusableLocalOnlyRoot("work\\notes", WIN_HOME, path.win32) ?? "", /not an absolute path/);
+  assert.match(unusableLocalOnlyRoot("C:notes", WIN_HOME, path.win32) ?? "", /not an absolute path/);
+  assert.match(unusableLocalOnlyRoot("~\\dev", undefined, path.win32) ?? "", /no home directory/);
+});
+
+test("POSIX rules stay POSIX: a backslash is part of a name, and a drive path is not absolute", () => {
+  assert.match(unusableLocalOnlyRoot("C:\\work\\notes", HOME, path.posix) ?? "", /not an absolute POSIX path/);
+  assert.equal(localOnlyRootOf(`${HOME}/dev/notes\\x`, ROOTS, HOME, path.posix, noRealpath), undefined);
+  assert.equal(localOnlyRootOf(`${HOME}/dev/notes/x`, ROOTS, HOME, path.posix, noRealpath), `${HOME}/dev/notes`);
 });

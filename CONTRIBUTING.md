@@ -41,8 +41,7 @@ Read [CONTEXT.md](CONTEXT.md) before naming anything. The code uses those words 
 - Persisted names (custom entry types, event kinds, ids, env vars, the log path) never change without a
   migration; see AGENTS.md.
 
-`npm test` and `npm run smoke` must pass. CI runs both on Linux and macOS, the tests on Windows without gating
-on them, a secret scan, and a check of what the package would publish (`npm run check-pack`).
+`npm test` and `npm run smoke` must pass. CI runs both on Linux and macOS, the tests on Windows too, a secret scan, and a check of what the package would publish (`npm run check-pack`).
 
 ## Verifying a new pi version
 
