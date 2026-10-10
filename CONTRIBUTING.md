@@ -87,10 +87,11 @@ Repository settings the workflows and docs rely on:
 
 - an `npm` environment with required reviewers and a deployment rule limited to `v*` tags, and a ruleset that
   protects `v*` tags and `main` (required checks, no force push);
-- the `main` ruleset requires a pull request with its review threads resolved and a linear history (squash or
+- the `main` ruleset requires a pull request approved by a code owner (`.github/CODEOWNERS`), with its review threads
+  resolved and a linear history (squash or
   rebase merges), and every CI check: the `test` legs, `workflows` and `secrets`. Maintainers can bypass it;
 - Dependabot alerts and security updates, plus the weekly version updates in `.github/dependabot.yml`; CodeQL
-  default setup; secret scanning with push protection;
+  default setup, whose high and critical alerts block a merge; secret scanning with push protection;
 - "Allow GitHub Actions to create and approve pull requests", so the nightly can open its pull request;
 - Discussions (the issue template links to them) and private vulnerability reporting (SECURITY.md does).
 
