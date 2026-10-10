@@ -147,7 +147,9 @@ function defaultObjectiveEvents(state: SessionState, index: MessageIndex, span: 
   if (!candidate) return cleared;
   const same = (quote: { text: string } | undefined) => quote !== undefined && normalizeWs(candidate.text) === normalizeWs(quote.text);
   if (candidate.goal ? same(state.goal?.quote) : state.objective !== undefined) return cleared;
-  const verdict = verify({ kind: "objective", ref: candidate.ordinal, text: candidate.text }, { resolver: index, state, provenance: { source: "pass", span, at }, caps: config.caps, nearDuplicateThreshold: 1, acceptedThisSpan: 0, rememberCap: 0 });
+  // A goal is checked as a quote only: the Request it never touches must not decide whether it is recorded.
+  const judged = candidate.goal ? { ...state, objective: undefined } : state;
+  const verdict = verify({ kind: "objective", ref: candidate.ordinal, text: candidate.text }, { resolver: index, state: judged, provenance: { source: "pass", span, at }, caps: config.caps, nearDuplicateThreshold: 1, acceptedThisSpan: 0, rememberCap: 0 });
   if (!verdict.ok || verdict.event.kind !== "objective.set") return cleared;
   if (!candidate.goal) return [...cleared, verdict.event];
   const { doneWhen: _none, ...goal } = verdict.event;
@@ -244,21 +246,45 @@ function seedRuleEvents(fold: Fold, outcome: NarrativeOutcome, diffEvents: State
 }
 
 /**
- * A switchover's turns before the span, each opened by its user message's ordinal: the previous summary is another
- * compactor's, so a value it records can be kept only where one of these shows it (named-values.ts withEarlierTurns).
+ * A switchover's turns since the state last judged one (sinceLastJudged), up to the span, each opened by its user
+ * message's ordinal: the previous summary is another compactor's, so a value it records can be kept only where one of
+ * these shows it (named-values.ts withEarlierTurns). As pi showed them: a message the context replaced is a source
+ * only in its replacement, and its original words, an injected message's and the summary's own only taint.
  */
-function earlierTurnsOf(branchEntries: SessionEntry[], index: MessageIndex, fromRef: string): SpanTexts | undefined {
-  const end = index.messages.find((message) => message.ordinal === fromRef)?.position;
-  if (end === undefined) return undefined;
+function earlierTurnsOf(branchEntries: SessionEntry[], index: MessageIndex, from: IndexedUserMessage | undefined, end: number | undefined, previousSummary: string | undefined): SpanTexts | undefined {
+  if (from === undefined || end === undefined) return undefined;
+  const edits = new Map<string, unknown>();
+  for (const entry of branchEntries) if (entry.type === "context_edit") edits.set(entry.targetId, entry.replacement);
   const ordinalAt = new Map(index.messages.map((message) => [message.position, message.ordinal]));
-  const turns = branchEntries.slice(0, end).flatMap((entry, position) => (entry.type === "message" ? [{ message: entry.message as AgentMessage, ordinal: ordinalAt.get(position) }] : []));
+  const turns: Array<{ ordinal?: string; message: AgentMessage; taintOnly?: boolean }> = [];
+  for (let position = from.position; position < end; position++) {
+    const entry = branchEntries[position];
+    if (entry.type === "custom_message") turns.push({ message: { role: "custom", content: entry.content, timestamp: 0 } as unknown as AgentMessage, taintOnly: true });
+    if (entry.type !== "message") continue;
+    const ordinal = ordinalAt.get(position);
+    const replacement = edits.get(entry.id) as { content?: unknown } | null | undefined;
+    if (replacement === undefined) { turns.push({ ...(ordinal ? { ordinal } : {}), message: entry.message as AgentMessage }); continue; }
+    turns.push({ ...(ordinal ? { ordinal } : {}), message: entry.message as AgentMessage, taintOnly: true });
+    if (replacement !== null && replacement.content !== undefined) turns.push({ message: replaced(entry.message as AgentMessage, replacement.content) });
+  }
+  if (previousSummary) turns.push({ message: { role: "custom", content: previousSummary, timestamp: 0 } as unknown as AgentMessage, taintOnly: true });
   return turnTextsOf(turns);
 }
 
+/** `message` with the content a context edit put in its place, as pi's projection shows it. */
+function replaced(message: AgentMessage, content: unknown): AgentMessage {
+  const role = (message as { role: string }).role;
+  if (role !== "user" && role !== "assistant" && role !== "toolResult") return message;
+  return { ...message, content: (role === "assistant" || role === "toolResult") && typeof content === "string" ? [{ type: "text", text: content }] : content } as AgentMessage;
+}
+
 function narrativeInputOf(input: PassInput, fold: Fold, config: StateConfig, deps: PassDeps, at: string, state: SessionState): NarrativeInput {
-  const earlierTurns = fold.seed.seed ? earlierTurnsOf(input.branchEntries, fold.index, fold.spanInput.fromRef) : undefined;
+  const earlierTurns = fold.seed.seed && config.narrativeMode !== "turns"
+    ? () => earlierTurnsOf(input.branchEntries, fold.index, sinceLastJudged(fold)[0], fold.index.messages.find((message) => message.ordinal === fold.spanInput.fromRef)?.position, input.preparation.previousSummary)
+    : undefined;
   return {
     ...(earlierTurns ? { earlierTurns } : {}),
+    userTextOf: (ordinal) => fold.index.textOf(ordinal),
     span: fold.spanInput,
     state,
     promptState: { ...promptStateOf(state, acceptedRemembers(fold.log, fold.span)), ...fold.seed },

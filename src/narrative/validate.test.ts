@@ -112,7 +112,7 @@ test("validateNarrativeDiff: an earlier message offered for labeling (known, not
 });
 
 test("validateNarrativeDiff: named values that stand in their turn are returned; one that does not is a fixable error", () => {
-  const facts = { ...labelling, spanTexts: { turnTextOf: (ordinal: string) => (ordinal === "u2" ? "[u2] never use mocks\nThe suite took 166 ms." : undefined), tainted: new Set<string>() } };
+  const facts = { ...labelling, spanTexts: () => ({ turnTextOf: (ordinal: string) => (ordinal === "u2" ? "[u2] never use mocks\nThe suite took 166 ms." : undefined), tainted: new Set<string>() }) };
   const result = validateNarrativeDiff({ ...bare, labels: { u1: "not a rule", u2: "not a rule" }, values: [{ name: "suite time", value: "166 ms", ref: "u2" }, { name: "other", value: "170 ms", ref: "u2" }] }, ctx(), facts);
   assert.deepEqual(result.values, [{ name: "suite time", value: "166 ms", source: "u2" }]);
   assert.deepEqual(result.errors.map((error) => [error.path, error.rejection.code]), [["values[1]", "value-not-in-turn"]]);
@@ -128,7 +128,7 @@ test("validateNarrativeDiff: a rule that names a lift target the state lacks kee
 });
 
 test("validateNarrativeDiff: a value cited to a turn outside the span is dropped without a retry: earlier spans' values are carried already", () => {
-  const facts = { ...labelling, spanTexts: { turnTextOf: (ordinal: string) => (ordinal === "u2" ? "[u2] took 166 ms" : undefined), tainted: new Set<string>() } };
+  const facts = { ...labelling, spanTexts: () => ({ turnTextOf: (ordinal: string) => (ordinal === "u2" ? "[u2] took 166 ms" : undefined), tainted: new Set<string>() }) };
   const result = validateNarrativeDiff({ ...bare, labels: { u1: "not a rule", u2: "not a rule" }, values: [{ name: "old", value: "16 ms", ref: "u12" }] }, ctx(), facts);
   assert.deepEqual(result.errors.map((error) => [error.path, error.rejection.code, error.fixable]), [["values[0]", "unknown-ref", false]]);
 });
@@ -169,6 +169,12 @@ test("validateNarrativeDiff: a switchover's seed rule left unlabeled is recorded
   assert.deepEqual([lifted.errors, lifted.withdrawn], [[], undefined]);
   const floorOnly = validateNarrativeDiff({ ...bare, labels: { u1: "not a rule", u3: "lifts u1" } }, ctx(), seeded);
   assert.deepEqual([floorOnly.errors, floorOnly.withdrawn, floorOnly.events.filter((event) => event.kind.startsWith("correction"))], [[], ["u1"], []]);
+});
+
+test("validateNarrativeDiff: in a chunk that does not own the seed, a lift of a seed rule no label recorded withdraws it", () => {
+  const later = { required: ["u3"], known: ["u1", "u3"], seed: ["u1"], seedOwned: false, textOf: (ordinal: string) => index.textOf(ordinal) };
+  const result = validateNarrativeDiff({ ...bare, labels: { u3: "lifts u1" } }, ctx(), later);
+  assert.deepEqual([result.errors, result.withdrawn], [[], ["u1"]]);
 });
 
 test("validateNarrativeDiff: a withdrawal of an earlier message no one offered withdraws nothing", () => {

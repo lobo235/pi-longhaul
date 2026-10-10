@@ -95,26 +95,33 @@ export interface SpanTexts {
  * more a value than one the user typed.
  */
 export function spanTextsOf(messages: AgentMessage[]): SpanTexts {
-  return turnTextsOf((messages as unknown as Rec[]).map((message) => {
+  // A wrong pointer inside the span is the model's to fix (a retry names the turn); only earlier turns resolve one.
+  const { holderOf: _earlierOnly, ...span } = turnTextsOf((messages as unknown as Rec[]).map((message) => {
     const tag = message.role === "user" ? /^\[(u\d+)\] /.exec(textsIn(message)[0] ?? "")?.[1] : undefined;
     return { message: message as unknown as AgentMessage, ...(tag ? { ordinal: tag } : {}) };
   }));
+  return span;
 }
 
-/** Each turn's text and the credential tokens of `messages`, where a user message that opens a turn carries its ordinal. */
-export function turnTextsOf(messages: ReadonlyArray<{ ordinal?: string; message: AgentMessage }>): SpanTexts {
+/**
+ * Each turn's text and the credential tokens of `messages`, where a user message that opens a turn carries its
+ * ordinal. A `taintOnly` message is no source (an injected message, words the context replaced) but its credentials
+ * refuse a value all the same.
+ */
+export function turnTextsOf(messages: ReadonlyArray<{ ordinal?: string; message: AgentMessage; taintOnly?: boolean }>): SpanTexts {
   const turns = new Map<string, string[]>();
   const tainted = new Set<string>();
   let current: string[] | undefined;
-  for (const { ordinal, message } of messages as unknown as ReadonlyArray<{ ordinal?: string; message: Rec }>) {
+  for (const { ordinal, message, taintOnly } of messages as unknown as ReadonlyArray<{ ordinal?: string; message: Rec; taintOnly?: boolean }>) {
     for (const text of everyTextIn(message)) for (const token of credentialTokensOf(text)) tainted.add(token);
     if (ordinal) turns.set(ordinal, (current = []));
-    current?.push(...textsIn(message));
+    if (!taintOnly) current?.push(...textsIn(message));
   }
   for (const output of secretStoreOutputs(messages.map((entry) => entry.message) as unknown as Rec[])) for (const token of tokensOf(output)) tainted.add(token);
   const joined = new Map([...turns].map(([ordinal, texts]) => [ordinal, texts.join("\n")]));
-  const newestFirst = [...joined].reverse();
-  const holderOf = (value: string) => newestFirst.find(([, text]) => flat(splitCredentialLines(text).clean.join("\n")).includes(flat(value)))?.[0];
+  // Each turn's clean text once, newest first: a value that misses is looked up again on every attempt.
+  let clean: Array<[string, string]> | undefined;
+  const holderOf = (value: string) => (clean ??= [...joined].reverse().map(([ordinal, text]) => [ordinal, flat(splitCredentialLines(text).clean.join("\n"))])).find(([, text]) => text.includes(flat(value)))?.[0];
   return { turnTextOf: (ordinal) => joined.get(ordinal), tainted, holderOf };
 }
 
