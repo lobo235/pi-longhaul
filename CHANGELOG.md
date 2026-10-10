@@ -8,6 +8,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-10-10
+
 ### Added
 
 - The Objective keeps the session's opening request as its Goal line once the Request moves to a later one (an
