@@ -46,10 +46,10 @@ a whole count. Anything still in the kept window is not judged, since the messag
 | `goal` | the message that says what the session builds, once summarized: kept when any line of the state or summary still names it, by the label's marker | better |
 | `rules` | labeled rules in force at the cut (given before it, not yet lifted) that a rules-section line matches by the rule's marker | better |
 | `span`, `earlier` | the same, split into rules given in the span this compaction closes and rules given before it | better |
-| `lifts` | rules the user withdrew before the cut that no rules-section line still shows in force (a line shows a rule lifted only by words outside its quotes: a rule's own "doesn't apply to JSON" does not count) | better |
+| `lifts` | rules the user withdrew before the cut that no rules-section line still shows in force (a line shows a rule lifted only by words outside its quotes: a rule's own "doesn't apply to JSON" does not count; the lift's own line, bound to the lifting message, quotes the rule's words and does not show it in force) | better |
 | `values` | labeled values (a timing, a port, a total, a hash) due at the last compaction before the turn that uses them, kept as a whole token | better |
 | `history` | the `values` only the conversation holds: the workspace cannot give them back | better |
-| `stray` | Longhaul only: rule lines bound to a message no rule was labeled at, such as a one-off request kept as a rule | lower |
+| `stray` | Longhaul only: rule lines bound to a message no rule or lift was labeled at, such as a one-off request kept as a rule | lower |
 
 Two labels were revised after a scoring run, both found by reading what a run missed or counted as stray. The
 csv-toolkit first benchmark time accepted only "166 ms", the reply's rounding; the turn that uses it again quotes
@@ -258,18 +258,26 @@ settings, one chained run and one takeover run, each with pi's own compaction al
 | `rules` | **220**/227 | 220/227 | 187/227 | **210**/227 | 209/227 |
 | `span` | **21**/22 | 21/22 | 16/22 | **20**/22 | 17/22 |
 | `earlier` | **199**/205 | 199/205 | 171/205 | 190/205 | **192**/205 |
-| `lifts` | 29/33 | 29/33 | **31**/33 | 22/33 | **30**/33 |
+| `lifts` | **32**/33 | 32/33 | 31/33 | 23/33 | **30**/33 |
 | `values` | **8**/9 | 6/9 | 6/9 | 2/9 | **9**/9 |
 | `history` | **4**/5 | 4/5 | 3/5 | 1/5 | **5**/5 |
-| `stray` (lower is better) | 21 | 21 | — | 22 | — |
+| `stray` (lower is better) | 18 | 18 | — | 21 | — |
 
 The goal row was counted from the saved states: the scoring copy of the label file lacked the goal labels for
 this run. Chained, the session's goal is now in every state (26 of 76 at `900ead3`), and the rest is within the
-spread of earlier chained runs (`rules` 217 to 227, `stray` 5 to 40). `lifts` 29 is three under them: one of the
-four states that showed csv-toolkit's u7 in force recorded no lift, and the other three did lift it, but also
-kept u18, the message that lifted it, as a rule of its own ("The rule about pasting the test summary ... is
-lifted. Mention test results when something fails."), whose words match u7's marker. pi's own `rules` (187
-against 211 at `900ead3`) moved further between two runs than Longhaul's did.
+spread of earlier chained runs (`rules` 217 to 227, `stray` 5 to 40). pi's own `rules` (187 against 211 at
+`900ead3`) moved further between two runs than Longhaul's did.
+
+The `lifts` and `stray` rows were rescored from the saved states after a scorer fix, with no new model calls
+(the fix only narrows what counts as in force or stray, so filtering each row's saved lists gives what a fresh
+run would score). As first scored, chained `lifts` read 29/33 and `stray` 21, takeover 22/33 and 22: three
+states had lifted csv-toolkit's u7 and kept u18, the message that lifted it, as a rule of its own ("The rule
+about pasting the test summary ... is lifted. Mention test results when something fails."). The lift word sits
+inside the quote, and u18's words match u7's marker, so the scorer read the lift as u7 still in force, and
+counted u18 as a stray rule. pi's lifts were unchanged: its summaries say "lifted" in their own words. The one
+chained miss left is real (that state still shows u7 with no lift), and so are the takeover misses: the rule
+still shown with no lift, or the lift bound to the wrong message (#15). Tables above this one were scored
+before the fix, so a state that kept a lift message as a rule counts there as a missed lift and a stray line.
 
 Taking over, stray rule lines fall from about 50 to 22 (11 in a first run of the seed floor alone, `2232e33`:
 `rules` 223, `earlier` 201, `lifts` 26), and `rules` stay level with pi's. This run had six narrative-less passes
