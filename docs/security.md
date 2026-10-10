@@ -395,7 +395,10 @@ configures.
 - The transcript is stored by pi, unencrypted. Longhaul adds to it; it does not protect it.
 - Quote verification accepts any user-role message. That includes text another extension injects as a user
   message (a relayed agent message, an MCP prompt) and anything the user pastes. A rule-shaped sentence in pasted
-  or relayed text can therefore be recorded as a correction if the summarizer is persuaded to quote it. After
-  relaying or pasting third-party text, read the state's "Constraints & corrections" section.
+  or relayed text can therefore be recorded as a correction if the summarizer is persuaded to quote it. On a
+  switchover it is the other way round: an earlier user-role message that reads as a standing rule ("from now
+  on ...", or a rule word outside a question, a request for now and a withdrawal) is recorded by
+  code unless the summarizer marks it a one-off, so relayed text worded as a standing rule needs no quote to land.
+  After relaying or pasting third-party text, read the state's "Constraints & corrections" section.
 - The config check and `status` are two commands. A process that rewrites `.git/config` between them can
   still plant a driver; such a process can already run anything it likes.

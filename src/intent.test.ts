@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
-import { buildMessageIndex, earlierRuleMessages, EARLIER_RULES_TOTAL_CHARS, closestWindow, normalizeWs, userText } from "./intent.ts";
+import { buildMessageIndex, earlierRuleMessages, EARLIER_RULES_TOTAL_CHARS, closestWindow, normalizeWs, readsAsStandingRule, userText } from "./intent.ts";
 import { assistantEntry, chain, compactionEntry, customEntry, piGoalMessage, piGoalStateEntry, userEntry } from "./test-support.ts";
 import { DEFAULT_CAPS } from "./store/events.ts";
 import { emptyState } from "./store/project.ts";
@@ -195,6 +195,47 @@ test("spanRefs: the first and last user ordinals among the compacted messages, b
   assert.deepEqual(index.spanRefs(messages.slice(0, 3)), { fromRef: "u1", toRef: "u2" });
   assert.deepEqual(index.spanRefs(messages.slice(1, 2)), { fromRef: "?", toRef: "?" });
   assert.deepEqual(index.spanRefs(messages), { fromRef: "u1", toRef: "u5" });
+});
+
+test("readsAsStandingRule: a sentence that says what always holds, not a question, a request for now, an idiom or a described feature", () => {
+  const cases: Array<[string, string, boolean]> = [
+    ["a never rule", "Never add npm dependencies to this project.", true],
+    ["an always rule after a request", "Fix the parser. Always run the whole test suite after every change.", true],
+    ["a must rule", "Every error response must be JSON with a proper status code.", true],
+    ["use only", "Use only the Python standard library in this project.", true],
+    ["a trailing only", "Don't use regular expressions for the headings; plain string methods only.", true],
+    ["a standing marker without a rule word", "Add a --top N option. And from now on every new CLI option gets a row in the options table.", true],
+    ["from here on", "Switch to two-space indentation from here on.", true],
+    ["a request for now", "Don't commit yet; first show me git status.", false],
+    ["an idiom", "Never mind the timing for now. Make the parser skip malformed lines.", false],
+    ["a question", "Is the log always going to arrive in time order? Check what the generator writes.", false],
+    ["a described feature", "Add a --status option that keeps only lines with the given status code.", false],
+    ["for the moment", "Stop the watcher for the moment, I want to read the output.", false],
+    ["a rule after a question", "Is the build green? Never push to main without a review.", true],
+    ["a dotted file name inside a sentence", "Keep the README.md options table current from now on.", true],
+    ["a change asked for once", "Make the parser skip malformed lines instead of throwing, and report how many it skipped.", false],
+    ["a lift with a standing marker", "The DRY: prefix rule is lifted; plain dry-run output is fine from now on.", false],
+    ["a retraction with a standing marker", "Forget what I said about commit message style; any message is fine from here on.", false],
+    ["a negated withdrawal word keeps the rule", "Never ignore a failing test; always fix it before moving on.", true],
+    ["don't forget it", "Never force-push to main, and don't forget it.", true],
+    ["a withdrawal in another clause", "Always run make check before a commit, no need to ask me first.", true],
+    ["not even this time", "Never deploy on a Friday, not even this time.", true],
+    ["yet in another clause", "Never push to main until CI is green, even if I have not reviewed yet.", true],
+    ["a tag question", "Never force-push to main, ok?", true],
+    ["a scope phrase is left to the model", "Use pnpm instead of npm in this repo.", false],
+    ["a project-wide rule without a rule word is left to the model", "Use tabs for indentation in every TypeScript file in this project.", false],
+    ["a request in the project", "Fix the failing test in the project.", false],
+    ["a search in the codebase", "Find where the parser is used in the codebase.", false],
+    ["a one-off push in this repo", "Force-push the rebased branch in this repo.", false],
+    ["a one-off delete in the repo", "Delete the generated files in the repo.", false],
+    ["a relayed status line", "I fixed the bug in the repo and pushed it.", false],
+    ["a question with a closing tag", "Do we always deploy on Friday, right?", false],
+    ["a bulk one-off in this repo", "Delete every generated file in this repo.", false],
+    ["another bulk one-off", "Force-push every branch in this repo.", false],
+    ["a tagged do-not rule", "Do not force-push to main, ok?", true],
+    ["another tagged do-not rule", "Do not commit secrets, right?", true],
+  ];
+  for (const [name, text, expected] of cases) assert.equal(readsAsStandingRule(text), expected, name);
 });
 
 test("earlierRuleMessages: rule-shaped user words before the span, oldest first; pastes skipped; the newest win the budget; a goal message offers its objective only", () => {

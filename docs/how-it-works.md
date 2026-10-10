@@ -56,14 +56,20 @@ When pi is about to compact and Longhaul is selected (`PI_COMPACTOR` unset, empt
 
 **Taking over from another compactor.** When the newest compaction on the branch was not Longhaul's (pi's own,
 or another extension's), its summary goes into the prompt, head and tail, and the model is asked to carry
-forward what it still holds. Because a summary paraphrases, the pass also lists the user's earlier rule-shaped
-messages verbatim and records each as a correction itself, unless the model marks it a one-off (a request, an
-answer or a question). The user's other earlier messages are shown too, each cut to its start, and each must be
+forward what it still holds. Because a summary paraphrases, the pass also lists the user's earlier messages that
+read as standing rules verbatim and records each as a correction itself, unless the model marks it a one-off (a
+request, an answer or a question). A message reads as one when a sentence of it, not a question (a closing "ok?"
+asks nothing), says "from now on" (or "from here on", "going forward") and withdraws nothing, or has a clause with a rule word (never, always, don't, do not, must, stop, only) that is not in
+a request for now ("yet", "for now", "this time"), not withdrawing something ("forget it"; "don't forget it" does
+not withdraw), not "never mind" and not describing a thing ("an option that keeps only lines"). It is judged clause
+by clause, so "never deploy on a Friday, not even this time" keeps its rule. A message it leaves out is still
+shown to the model and labeled like the user's other earlier messages. The user's other earlier messages are shown too, each cut to its start, and each must be
 labeled like a message of the span: a withdrawal ("the DRY: prefix rule is lifted") is labeled `lifts u<n>` and
 that rule is not carried, and a rule worded without a rule word ("tests go under tests/", "our servers run Node
 22") is labeled a rule and carried. An earlier message left unlabeled costs a retry, in both modes; one longer than
-the excerpt shown is recorded only from the exact words given for it. A rule-shaped earlier message needs no label
-but may carry one, so one that replaced an earlier rule ("switch to two-space indentation instead of tabs") is
+the excerpt shown is recorded only from the exact words given for it. An earlier message read as a standing rule needs no label
+but may carry one, so one that replaced an earlier rule ("switch to two-space indentation instead of tabs from now
+on") is
 labeled `rule and lifts u<n>`; left unlabeled it is recorded as a rule in message order, and a replacement it makes
 is asked about as in a span. A one-off the model fails to mark is carried as a rule; it names
 its message and can be withdrawn like any correction. A value the earlier summary records (a measurement, a hash,
@@ -123,6 +129,11 @@ is a dead end or an open error, resume is set) may be excused by the model with 
 span record keeps. The pass has a time budget (5 minutes, 2 per turn); sections it cannot reach carry from the
 previous state. Turns mode makes five calls or more per compaction; it exists for small models that write a poor
 single diff.
+
+Taking over from another compactor, turns mode has two gaps the default mode does not ([#9](https://github.com/lobo235/pi-longhaul/issues/9)):
+an earlier message read as a standing rule cannot carry a label, so one that replaced an earlier rule is recorded
+beside it until a later message lifts one; and the model names no values in turns mode (only the ones code learns
+from tool output are kept), so a value only the earlier summary held is not kept.
 
 ## The log
 

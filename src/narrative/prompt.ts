@@ -29,8 +29,10 @@ import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from ".
  *   must be labeled (prepare.ts carryUnlabeled).
  * state-12: a description of what is being built is not a rule unless stated as standing over later work; how to
  *   carry out a withdrawal is not a new rule.
+ * state-15: an earlier message recorded as a rule still takes a label when it replaces or withdraws an earlier rule
+ *   (the seed floor now records "from now on" replacements, which "they need no label" left lifting nothing).
  */
-export const NARRATIVE_PROMPT_REVISION = "state-14";
+export const NARRATIVE_PROMPT_REVISION = "state-15";
 
 export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a coding session that is being compacted. You are given the state so far, the user's messages with their ordinals (u1, u2, ...), and the conversation being compacted. Answer with ONE fenced json block and nothing else:
 
@@ -81,7 +83,7 @@ export function seedOf(previousSummary: string | undefined): string | undefined 
   return `${text.slice(0, SEED_HEAD_CHARS)}\n[… ${text.length - SEED_HEAD_CHARS - SEED_TAIL_CHARS} chars elided …]\n${text.slice(-SEED_TAIL_CHARS)}`;
 }
 
-const SEED_RULES_GUIDANCE = 'The user\'s own earlier messages that read like standing rules, verbatim, with their ordinals. Each one is recorded as corrections automatically, word for word: do not copy them into "corrections", and they need no label. List the ordinal of any that was a one-off request, an answer or a question rather than a rule still in force in a top-level "oneOffs" array, e.g. "oneOffs": ["u3"]; list none when all of them still hold. A rule a later message withdrew or replaced is not in force either: label that later message "lifts u<n>" (or "rule and lifts u<n>"), whether it is listed here or among the other messages.';
+const SEED_RULES_GUIDANCE = 'The user\'s own earlier messages that read like standing rules, verbatim, with their ordinals. Each one is recorded as corrections automatically, word for word: do not copy them into "corrections", and they need no label unless one replaces or withdraws an earlier rule: label that one "rule and lifts u<n>" or "lifts u<n>". List the ordinal of any that was a one-off request, an answer or a question rather than a rule still in force in a top-level "oneOffs" array, e.g. "oneOffs": ["u3"]; list none when all of them still hold. A rule a later message withdrew or replaced is not in force either: label that later message "lifts u<n>" (or "rule and lifts u<n>"), whether it is listed here or among the other messages.';
 
 const SEED_CONTEXT_GUIDANCE = 'The user\'s other earlier messages, each cut to its start. A later message may withdraw or replace an earlier rule: label it "lifts u<n>" (or "rule and lifts u<n>") with the earlier rule\'s ordinal, and that rule is not carried. Label every one of these too: "rule" when it is a standing rule still in force, however it is worded ("tests go under tests/", "our servers run Node 22"), "not a rule" otherwise.';
 
