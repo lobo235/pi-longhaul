@@ -249,6 +249,34 @@ requests kept as rules, are as many as before. The chained runs of the same pair
 lifts, `main` 217/227 and 33/33) differ less than two runs of near-identical code did (`stray` 15 at `900ead3`
 and 40 at `main`), so they are not read as a change.
 
+**This release** (2026-10-10, commit `6fab98f`: the seed floor of #14 and the Goal line of #16, same model and
+settings, one chained run and one takeover run, each with pi's own compaction alongside):
+
+| labeled | chained `state` | `state-unlearned` | `pi-default` | takeover `state` | `pi-default` |
+|---|---|---|---|---|---|
+| `goal` | **76**/76 | 76/76 | 76/76 | 76/76 | 76/76 |
+| `rules` | **220**/227 | 220/227 | 187/227 | **210**/227 | 209/227 |
+| `span` | **21**/22 | 21/22 | 16/22 | **20**/22 | 17/22 |
+| `earlier` | **199**/205 | 199/205 | 171/205 | 190/205 | **192**/205 |
+| `lifts` | 29/33 | 29/33 | **31**/33 | 22/33 | **30**/33 |
+| `values` | **8**/9 | 6/9 | 6/9 | 2/9 | **9**/9 |
+| `history` | **4**/5 | 4/5 | 3/5 | 1/5 | **5**/5 |
+| `stray` (lower is better) | 21 | 21 | — | 22 | — |
+
+The goal row was counted from the saved states: the scoring copy of the label file lacked the goal labels for
+this run. Chained, the session's goal is now in every state (26 of 76 at `900ead3`), and the rest is within the
+spread of earlier chained runs (`rules` 217 to 227, `stray` 5 to 40). `lifts` 29 is three under them: one of the
+four states that showed csv-toolkit's u7 in force recorded no lift, and the other three did lift it, but also
+kept u18, the message that lifted it, as a rule of its own ("The rule about pasting the test summary ... is
+lifted. Mention test results when something fails."), whose words match u7's marker. pi's own `rules` (187
+against 211 at `900ead3`) moved further between two runs than Longhaul's did.
+
+Taking over, stray rule lines fall from about 50 to 22 (11 in a first run of the seed floor alone, `2232e33`:
+`rules` 223, `earlier` 201, `lifts` 26), and `rules` stay level with pi's. This run had six narrative-less passes
+(the model's answer was not valid JSON), against two to four in earlier takeover runs, and a narrative-less pass
+keeps only the rules code records: most of the misses are ts-logstat's rules with no rule-shaped word, which only
+a label records. Values and lifts given before the takeover remain pi's strength there (#15 tracks the lifts).
+
 **`turns` mode** (chained, `state-turns`): `rules` 225/227, `span` 21/22, `earlier` 204/205, `lifts` 29/33,
 `values` 7/9, `history` 4/5, `stray` 5; `reused` 0.80, `facts` 0.29. It cuts stray rule lines from 15 to 5 and
 matches or trails the default elsewhere, at about six times the prompt tokens (60,125 against 9,906 per
