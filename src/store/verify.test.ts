@@ -70,6 +70,34 @@ test("verify rejections (table)", () => {
   }
 });
 
+test("verify: the summarizer cannot re-set the objective to its own message or move it back to an earlier one", () => {
+  const atU3 = { ...emptyState(), objective: { quote: quote("u3", "hand-edit it this once"), setSpan: 1, movedFrom: [] } };
+  const diff = { ...PROV, source: "diff" as const };
+  const cases: Array<{ name: string; proposal: Parameters<typeof verify>[0]; code: string }> = [
+    { name: "same message, other words", proposal: { kind: "objective", ref: "u3", text: "The no-mocks rule is lifted" }, code: "objective-unchanged" },
+    { name: "an earlier message", proposal: { kind: "objective", ref: "u1", text: "Build the state compactor." }, code: "objective-not-later" },
+  ];
+  for (const c of cases) {
+    const verdict = verify(c.proposal, ctxWith({ state: atU3, provenance: diff }));
+    assert.ok(!verdict.ok, c.name);
+    assert.equal(verdict.rejection.code, c.code, c.name);
+  }
+  const later = verify({ kind: "objective", ref: "u4", text: "go ahead and push the branch" }, ctxWith({ state: atU3, provenance: diff }));
+  assert.ok(later.ok && later.event.kind === "objective.set" && later.event.quote.ordinal === "u4");
+});
+
+test("verify: the same objective message with a done-when it lacked attaches the done-when instead of moving the objective", () => {
+  const atU1 = { ...emptyState(), objective: { quote: quote("u1", "Build the state compactor."), setSpan: 1, movedFrom: [] } };
+  const verdict = verify({ kind: "objective", ref: "u1", text: "Build the state compactor", doneWhen: { ref: "u1", text: "Done when npm test passes on the whole tree." } }, ctxWith({ state: atU1, provenance: { ...PROV, source: "diff" } }));
+  assert.ok(verdict.ok && verdict.event.kind === "objective.doneWhen" && verdict.event.quote.text === "Done when npm test passes on the whole tree.");
+});
+
+test("verify: an explicit remember may still point the objective back at an earlier message", () => {
+  const atU3 = { ...emptyState(), objective: { quote: quote("u3", "hand-edit it this once"), setSpan: 1, movedFrom: [] } };
+  const verdict = verify({ kind: "objective", ref: "u1", text: "Build the state compactor." }, ctxWith({ state: atU3 }));
+  assert.ok(verdict.ok && verdict.event.kind === "objective.set");
+});
+
 test("verify: the diff hand (source diff) is not subject to the remember cap; a lift that resolves later is accepted with the target's ordinal", () => {
   const withR1 = project(logOf(ev({ kind: "correction.add", id: "R1", quote: quote("u2", "Never use mocks in these tests; use fakes."), span: 1 }), closeEvent(1)), DEFAULT_CAPS);
   const verdict = verify({ kind: "lift", target: "R1", text: "The no-mocks rule is lifted" }, ctxWith({ state: withR1, acceptedThisSpan: 10, provenance: { ...PROV, source: "diff" } }));

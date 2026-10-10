@@ -6,7 +6,7 @@ import type { OutputRecall } from "./store/output.ts";
 import type { RecallHit } from "./store/recall.ts";
 
 export const RECALL_CHARS_CAP = 4000;
-export const NO_RETRY_CODES: ReadonlySet<Rejection["code"]> = new Set(["near-duplicate", "remember-cap", "already-lifted", "no-objective"]);
+export const NO_RETRY_CODES: ReadonlySet<Rejection["code"]> = new Set(["near-duplicate", "remember-cap", "already-lifted", "no-objective", "objective-unchanged", "objective-not-later"]);
 
 function eventLine(event: StateEvent): string {
   switch (event.kind) {

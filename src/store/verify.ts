@@ -83,6 +83,19 @@ function verifyQuoteKind(proposal: Extract<Proposal, { kind: "objective" | "done
         if (!done.ok) return reject(done.rejection);
         doneWhen = done.quote;
       }
+      const current = ctx.state.objective;
+      if (current) {
+        // The same message quoted again is no move: it would push the objective onto its own history and drop its
+        // done-when. Only the done-when it lacked is new.
+        if (resolved.quote.messageId === current.quote.messageId) {
+          if (doneWhen && !current.doneWhen) return stamp(ctx, undefined, { kind: "objective.doneWhen", quote: doneWhen });
+          return reject({ code: "objective-unchanged", ordinal: current.quote.ordinal });
+        }
+        // The summarizer moves the objective forward only: the user returns to earlier work in a new message. An
+        // explicit remember is the agent's own deliberate choice and may point back.
+        const currentPosition = ctx.resolver.position(current.quote.messageId) ?? -1;
+        if (ctx.provenance.source !== "remember" && resolved.position < currentPosition) return reject({ code: "objective-not-later", ordinal: resolved.quote.ordinal, targetOrdinal: current.quote.ordinal });
+      }
       return stamp(ctx, undefined, { kind: "objective.set", quote: resolved.quote, doneWhen });
     }
     case "done-when":
