@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+# No npm cache anywhere in this workflow: its test job runs a pi nobody has verified yet, and a cache entry it
+# wrote could reach every later run on every branch.
+
 concurrency:
   group: nightly-pi
   cancel-in-progress: false
@@ -31,7 +34,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-          cache: npm
+          package-manager-cache: false
       - run: npm ci
 
       - name: Find the newest pi and how it relates to pi-compat.json
@@ -76,6 +79,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+          package-manager-cache: false
       - name: Record it in a local commit (no token)
         run: |
           npm install --package-lock-only --ignore-scripts --save-dev --save-exact "@earendil-works/pi-coding-agent@${PI_VERSION}"
