@@ -88,13 +88,14 @@ function writeSession(root: string): { cwd: string; file: string } {
 }
 
 /**
- * npm, run through the npm that started this script when there is one (`npm_execpath`), so no shell is needed; a
- * direct run falls back to `npm` on the search path, through a shell on Windows, where it is a .cmd shim.
+ * npm without a shell, which would re-parse arguments such as a temporary path: the npm-cli.js that started this
+ * script (`npm_execpath`), else on Windows the one installed next to node, else `npm` on the search path.
  */
 function runNpm(args: string[], cwd: string): string {
-  const npmCli = process.env.npm_execpath;
-  if (npmCli && npmCli.endsWith(".js")) return execFileSync(process.execPath, [npmCli, ...args], { cwd, encoding: "utf8" });
-  return execFileSync("npm", args, { cwd, encoding: "utf8", shell: process.platform === "win32" });
+  const started = process.env.npm_execpath;
+  const besideNode = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+  const cli = started && /npm-cli\.c?js$/.test(started) ? started : process.platform === "win32" && fs.existsSync(besideNode) ? besideNode : undefined;
+  return cli ? execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" }) : execFileSync("npm", args, { cwd, encoding: "utf8" });
 }
 
 /** The package as npm would publish it, unpacked where an install puts it; returns its directory. */
@@ -122,7 +123,14 @@ function compactOnce(session: { cwd: string; file: string }, env: NodeJS.Process
   const args = ["--mode", "rpc", "--session", session.file, "--model", `${PROVIDER}/${MODEL}`, "-ne", "-e", extension];
   const child = spawn(process.execPath, [piCli(), ...args], { cwd: session.cwd, env, stdio: ["pipe", "pipe", "inherit"] });
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { child.kill(); reject(new Error(`no answer to compact within ${TIMEOUT_MS / 1000} s`)); }, TIMEOUT_MS);
+    // Settle only once pi has exited: Windows refuses to delete a directory a running process works in.
+    const settleAfterExit = (settle: () => void) => {
+      child.removeAllListeners("exit");
+      child.once("exit", settle);
+      child.stdin.end();
+      child.kill();
+    };
+    const timer = setTimeout(() => settleAfterExit(() => reject(new Error(`no answer to compact within ${TIMEOUT_MS / 1000} s`))), TIMEOUT_MS);
     child.on("error", reject);
     child.on("exit", (code) => { clearTimeout(timer); reject(new Error(`pi exited (${code}) before answering compact`)); });
     readline.createInterface({ input: child.stdout }).on("line", (line) => {
@@ -130,10 +138,7 @@ function compactOnce(session: { cwd: string; file: string }, env: NodeJS.Process
       try { message = JSON.parse(line); } catch { return; }
       if (message.type !== "response" || message.id !== "smoke") return;
       clearTimeout(timer);
-      child.removeAllListeners("exit");
-      child.stdin.end();
-      child.kill();
-      resolve(message);
+      settleAfterExit(() => resolve(message));
     });
     child.stdin.write(JSON.stringify({ id: "smoke", type: "compact" }) + "\n");
   });
@@ -171,7 +176,7 @@ async function main(): Promise<number> {
   } finally {
     fake.server.close();
     if (keep) console.log(`kept ${root}`);
-    else fs.rmSync(root, { recursive: true, force: true });
+    else fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }
 
