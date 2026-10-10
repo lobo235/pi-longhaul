@@ -43,7 +43,7 @@ Read [CONTEXT.md](CONTEXT.md) before naming anything. The code uses those words 
 - Persisted names (custom entry types, event kinds, ids, env vars, the log path) never change without a
   migration; see AGENTS.md.
 
-`npm test` and `npm run smoke` must pass. CI runs both on Linux, macOS and Windows, a secret scan, a security audit of the workflows (zizmor), and a check of what the package would publish (`npm run check-pack`).
+`npm test` and `npm run smoke` must pass. CI runs both on Linux, macOS and Windows, a secret scan, a security audit of the workflows (zizmor), a check of what the package would publish (`npm run check-pack`), and the cross-version smoke (`npm run cross-version`): one transcript handed through every pi in `pi-compat.json`, oldest to newest and back, with a Longhaul compaction by each. It installs each pi from npm into a temporary directory, with install scripts off and its dependencies as they were on that pi's release day (`npm install --before`), so it needs the network, and a local run executes that code as you; `--extra x.y.z` adds a version, `--keep` keeps the directory.
 
 ## Verifying a new pi version
 
@@ -55,7 +55,9 @@ To verify one:
    is the pi `npm test` runs against.
 2. `npm test`. The version gate in `src/pi-compat.test.ts` fails when that pi is outside every `major.minor`
    line `pi-compat.json` lists, which is expected for a new line; any other failure is a pi change to handle
-   first. Then `npm run smoke` (one compaction by that pi, against a fake model).
+   first. Then `npm run smoke` (one compaction by that pi, against a fake model), and
+   `npm run cross-version -- --extra <version>`: the new pi must continue transcripts every listed pi wrote, and
+   they must continue its.
 3. Install that pi globally, install your checkout (`pi install /path/to/pi-longhaul`), and run one real
    compaction on a synthetic session: the *Live check* in
    [docs/setup-with-an-agent.md](docs/setup-with-an-agent.md) does exactly this. The log must show a
@@ -65,7 +67,8 @@ To verify one:
    [docs/evaluation.md](docs/evaluation.md)).
 5. Record it: `node scripts/record-pi-version.ts <version> "<what you ran>" "<what you ran>"`.
 
-A nightly job runs steps 1 and 2 against the newest pi and opens a pull request recording it when they pass;
+A nightly job runs steps 1 and 2 (the cross-version smoke included) against the newest pi and opens a pull request
+recording it when they pass;
 step 3 is still a maintainer's to run before merging.
 
 ## Releasing (maintainers)

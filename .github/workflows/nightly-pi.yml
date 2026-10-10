@@ -61,6 +61,12 @@ jobs:
           npm run load-smoke
           npm run smoke
 
+      - name: Continue one transcript across every verified pi and this one
+        if: steps.pi.outputs.status != 'exact'
+        env:
+          PI_VERSION: ${{ steps.pi.outputs.version }}
+        run: npm run cross-version -- --extra "$PI_VERSION"
+
   record:
     needs: test
     if: needs.test.outputs.status == 'unverified'
