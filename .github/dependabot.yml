@@ -1,0 +1,28 @@
+# Weekly updates for the GitHub Actions this repository pins by commit SHA, and for its npm dev tooling. pi and the
+# packages that move with it are not updated here: the vendored pi changes only through the nightly job and
+# pi-compat.json (CONTRIBUTING.md). A release must be out a week before it is proposed (cooldown).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "@earendil-works/*"
+      - dependency-name: typebox
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      dev-tooling:
+        patterns: ["*"]

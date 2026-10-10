@@ -41,7 +41,7 @@ Read [CONTEXT.md](CONTEXT.md) before naming anything. The code uses those words 
 - Persisted names (custom entry types, event kinds, ids, env vars, the log path) never change without a
   migration; see AGENTS.md.
 
-`npm test` and `npm run smoke` must pass. CI runs both on Linux and macOS, the tests on Windows too, a secret scan, and a check of what the package would publish (`npm run check-pack`).
+`npm test` and `npm run smoke` must pass. CI runs both on Linux, macOS and Windows, a secret scan, a security audit of the workflows (zizmor), and a check of what the package would publish (`npm run check-pack`).
 
 ## Verifying a new pi version
 
@@ -87,6 +87,10 @@ Repository settings the workflows and docs rely on:
 
 - an `npm` environment with required reviewers and a deployment rule limited to `v*` tags, and a ruleset that
   protects `v*` tags and `main` (required checks, no force push);
+- the `main` ruleset requires a pull request with its review threads resolved and a linear history (squash or
+  rebase merges), and every CI check: the `test` legs, `workflows` and `secrets`. Maintainers can bypass it;
+- Dependabot alerts and security updates, plus the weekly version updates in `.github/dependabot.yml`; CodeQL
+  default setup; secret scanning with push protection;
 - "Allow GitHub Actions to create and approve pull requests", so the nightly can open its pull request;
 - Discussions (the issue template links to them) and private vulnerability reporting (SECURITY.md does).
 

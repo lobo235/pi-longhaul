@@ -86,8 +86,8 @@ Requirements:
   per session (see *pi versions*).
 - Node.js 22.19 or newer (pi's own requirement).
 - A model with a context window of at least 32k tokens. Longhaul warns once per session below that.
-- Linux, macOS or Windows. The tests gate a release on all three; the compaction smoke (a real pi) runs on Linux
-  and macOS only. On Windows the log relies on your profile's permissions, which have no `0600` (`docs/security.md` T6).
+- Linux, macOS or Windows. The tests and the compaction smoke (a real pi) gate a release on all three. On Windows
+  the log relies on your profile's permissions, which have no `0600` (`docs/security.md` T6).
 - git 2.26 or newer for the workspace snapshot (branch, tree, last test). Without it the snapshot is skipped and
   the rest of the state is unaffected. A repository whose own git config defines a filter driver is skipped as
   well, so a checkout you did not make cannot run a program through it, and so is a partial clone
@@ -329,8 +329,6 @@ newest pi and opens an issue when it breaks.
 - **Models that cannot turn reasoning off cost more** per compaction (see *Cost*).
 - **Context windows under 32k tokens are not supported.** The state's caps do not scale down yet.
 - **Google's APIs are untested.** On Google, most models cannot turn reasoning off.
-- **Windows has no compaction smoke in CI**: its tests gate a release, but a real pi compaction is only exercised on
-  Linux and macOS.
 - **A child pi started with `--no-extensions`** compacts with pi's own compaction.
 - **An unverified pi** warns, and a compaction that fails on it falls back to pi's own.
 

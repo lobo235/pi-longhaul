@@ -20,6 +20,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       version: ${{ steps.pi.outputs.version }}
       status: ${{ steps.pi.outputs.status }}
@@ -61,43 +62,54 @@ jobs:
     needs: test
     if: needs.test.outputs.status == 'unverified'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # push the nightly/pi-<version> branch
+      pull-requests: write # open the pull request recording it
     env:
-      GH_TOKEN: ${{ github.token }}
       PI_VERSION: ${{ needs.test.outputs.version }}
+      BRANCH: nightly/pi-${{ needs.test.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
-      - name: Open a pull request recording it
+      - name: Record it in a local commit (no token)
         run: |
-          branch="nightly/pi-${PI_VERSION}"
+          npm install --package-lock-only --ignore-scripts --save-dev --save-exact "@earendil-works/pi-coding-agent@${PI_VERSION}"
+          node scripts/record-pi-version.ts "$PI_VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add package.json package-lock.json pi-compat.json
+          git commit -m "pi-compat: record pi ${PI_VERSION} (nightly)"
+      - name: Open a pull request recording it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
           # Keyed on the pull request, not the branch: when creating it fails (the repository does not allow
           # Actions to open pull requests), the branch is already pushed, and a branch check would turn every
           # later night into a silent success. A pull request in any state, closed included, means a maintainer
           # has seen this version.
-          if [ "$(gh pr list --head "$branch" --state all --json number --jq length)" != "0" ]; then echo "a pull request for $branch exists"; exit 0; fi
-          if ! git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
-            npm install --package-lock-only --ignore-scripts --save-dev --save-exact "@earendil-works/pi-coding-agent@${PI_VERSION}"
-            node scripts/record-pi-version.ts "$PI_VERSION"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git switch -c "$branch"
-            git add package.json package-lock.json pi-compat.json
-            git commit -m "pi-compat: record pi ${PI_VERSION} (nightly)"
-            git push origin "$branch"
+          if [ "$(gh pr list --head "$BRANCH" --state all --json number --jq length)" != "0" ]; then echo "a pull request for $BRANCH exists"; exit 0; fi
+          if ! git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            gh auth setup-git
+            git push origin "$BRANCH"
           fi
-          gh pr create --head "$branch" --title "Record pi ${PI_VERSION}" --body "The nightly job ran the unit suite, the load smoke and one real compaction (fake model) on pi ${PI_VERSION}, and all passed. Before merging, run the live check in CONTRIBUTING.md (*Verifying a new pi version*) with a real model. Close and reopen this pull request to start CI on it: a pull request opened by the workflow token does not trigger workflows."
+          if ! gh pr create --head "$BRANCH" --title "Record pi ${PI_VERSION}" --body "The nightly job ran the unit suite, the load smoke and one real compaction (fake model) on pi ${PI_VERSION}, and all passed. Before merging, run the live check in CONTRIBUTING.md (*Verifying a new pi version*) with a real model. Close and reopen this pull request to start CI on it: a pull request opened by the workflow token does not trigger workflows."; then
+            echo "::error::could not open the pull request from $BRANCH. Enable Settings > Actions > General > 'Allow GitHub Actions to create and approve pull requests', or open it by hand; the next nightly run retries."
+            exit 1
+          fi
 
   report-failure:
     needs: test
     if: failure() && needs.test.outputs.version != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
-      issues: write
+      issues: write # open the failure issue
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}

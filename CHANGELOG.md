@@ -14,7 +14,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
   compactions instead of a rewritten summary, with the `longhaul_remember` and `longhaul_recall` tools.
 - Windows: `localOnlyRoots` takes Windows paths (`C:\...`, `\\server\share\...`, `~\...`), matched by Windows
   rules (either separator, no case, never across drives); `~` is the user profile there. The log refuses a
-  symlink by `lstat` where the open cannot, and the tests gate a release on Windows as on Linux and macOS.
+  symlink by `lstat` where the open cannot, and the tests and the compaction smoke gate a release on Windows as
+  on Linux and macOS.
 - `longhaul.json` in pi's agent dir, read fresh at every compaction: `routeProviders`, `localOnlyRoots`,
   `summarizerHeaders` and `keptWindowThinking`, beside the caps and policy keys.
 - The summarizer labels every user message of the span (`rule`, `not a rule`, `lifts R<n>`, `rule and lifts
@@ -83,8 +84,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 - Docs: a setup guide written for coding agents, the security model, the evaluation method and its first
   results (one local 27B model, chained and takeover runs, every measure including those pi's own wins), and
   contributor guides (AGENTS.md, CONTRIBUTING.md, SECURITY.md, issue and pull request templates).
-- CI: tests on Linux and macOS (and on Windows, not gating), a compaction smoke that loads the packed package
-  into a real pi with a fake model, a secret scan and a package-contents check; a nightly run against the newest pi; npm publishing
+- CI: tests on Linux, macOS and Windows, a compaction smoke that loads the packed package
+  into a real pi with a fake model, a secret scan, a workflow security audit (zizmor), Dependabot updates and a package-contents check; a nightly run against the newest pi; npm publishing
   by trusted publishing.
 - `docs/how-it-works.md`: a compaction step by step, the log records, and the tools for looking at a state.
 - `eval/` (repository only): six synthetic scenarios, and the recorder and checker that make the
