@@ -1,0 +1,7 @@
+/node_modules
+/score-out/
+/logs/
+*.log
+.env
+.env.*
+/*.tgz

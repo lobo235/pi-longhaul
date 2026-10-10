@@ -1,0 +1,31 @@
+{
+  "name": "sh-backup",
+  "description": "A bash backup-rotation script with tests, from an empty directory. Rules: set -euo pipefail and shellcheck-clean style (u2), never delete outside the backup directory (u6), dry-run output prefixed with DRY: (u10, lifted at u20). Values reused later: the retention counts (u4, u14), commit hashes (u8, u17, u23), the archive name format (u3, u19).",
+  "turns": [
+    "Let's write a backup rotation tool in bash in this empty directory. Start with git init and bin/backup.sh that takes a source directory and a destination directory and writes a tar.gz archive of the source into the destination. Add a tests/run.sh that creates a temporary source tree, runs the script and checks the archive exists. Run it.",
+    "Always start every script with set -euo pipefail and quote every variable expansion.",
+    "Name the archives <source-basename>-YYYYMMDD-HHMMSS.tar.gz using the current UTC time, and make the tests check the name format.",
+    "Add rotation: keep the 7 newest daily archives and delete older ones. The count comes from a --keep-daily option with 7 as the default. Test it by creating 10 fake archives with touch and different timestamps in their names.",
+    "Add a --help option that prints the usage and the options.",
+    "Never delete anything outside the destination directory, and only delete files that match the archive name pattern. Add a test with a stray file in the destination that must survive rotation.",
+    "Add a --verify option that lists the archive's contents with tar -tzf after writing it and fails if the listing is empty.",
+    "Commit this with a short message and tell me the hash.",
+    "Add a --exclude option that can be repeated and is passed to tar as --exclude patterns. Test it with a .cache directory in the source.",
+    "Add a --dry-run option that prints what it would create and delete without touching anything. Every dry-run line must start with DRY: so it is easy to grep.",
+    "What happens when the source directory does not exist? Make it print an error to stderr and exit 2, and add a test.",
+    "Add a lock file in the destination so two runs cannot rotate at the same time; the second run should exit 3 with a clear message. Use flock if it is available.",
+    "Run the whole test suite and tell me how many checks pass.",
+    "Add weekly retention: keep the newest archive from each of the last 4 weeks as well, with a --keep-weekly option, default 4. Archives that are kept for either reason survive.",
+    "Write tests for the weekly retention with fake archives spread over six weeks.",
+    "Add a --quiet option that prints errors and nothing else.",
+    "Commit this and give me the hash.",
+    "Write a systemd timer and service example under examples/ that runs the script daily, with the paths as placeholders.",
+    "What name format did we choose for the archives, and does the weekly retention code parse it the same way the daily code does?",
+    "The DRY: prefix rule is lifted; plain dry-run output is fine from now on, but keep the existing tests passing.",
+    "Add a --restore option that extracts the newest archive into a given directory, refusing a non-empty target.",
+    "Write a README.md with every option and an example of each.",
+    "Run the full test suite, commit with a message summarising the options, and give me the hash.",
+    "Show me git log --oneline and tell me which commit added the lock file.",
+    "Final pass: list the rules I gave you during this session and check the scripts against each one."
+  ]
+}

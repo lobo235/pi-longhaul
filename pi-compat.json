@@ -1,0 +1,56 @@
+{
+  "$comment": "pi versions Longhaul has been verified against. A version on the same major.minor line as a listed one runs silently; any other warns once per session. npm test fails on a vendored pi outside every listed line. To add one, follow CONTRIBUTING.md (Verifying a new pi version). Entries before 2026-10-07 were verified before the public release.",
+  "verified": [
+    {
+      "pi": "0.87.1",
+      "date": "2026-09-28",
+      "how": [
+        "npm test on the vendored pi: typecheck, unit suite, load smoke, and the extension-API contract checks (appendEntry, registerTool, the session_before_compact payload, tool results)",
+        "a real pi loaded the extension and logged extension-loaded with the version verified"
+      ]
+    },
+    {
+      "pi": "0.99.1",
+      "date": "2026-09-29",
+      "how": [
+        "npm test on the vendored pi; one contract moved (an optional isError on tool results) and the check was updated to assert what the extension relies on",
+        "one real compaction in an interactive pi session: a compaction record with an accepted diff, and one span record on the transcript"
+      ]
+    },
+    {
+      "pi": "1.0.0",
+      "date": "2026-10-02",
+      "how": [
+        "npm test on the vendored pi; no contract moved",
+        "one real compaction in an interactive pi session: a compaction record with an accepted diff",
+        "one paired scorer run: every arm scored without an error"
+      ]
+    },
+    {
+      "pi": "1.0.1",
+      "date": "2026-10-03",
+      "how": [
+        "npm test on the vendored pi; no contract moved",
+        "the vendored package layout changed (pi's own dependencies are hoisted); the contract checks resolve both layouts"
+      ]
+    },
+    {
+      "pi": "1.0.2",
+      "date": "2026-10-04",
+      "how": [
+        "npm test on the vendored pi; no contract moved",
+        "one real compaction through pi --mode rpc on a long session: a compaction record with an accepted diff",
+        "one paired scorer run: every arm scored without an error"
+      ]
+    },
+    {
+      "pi": "1.0.4",
+      "date": "2026-10-06",
+      "how": [
+        "npm test on the vendored pi; no contract moved",
+        "one real compaction through pi --mode rpc on a long session: a compaction record with an accepted diff",
+        "one paired scorer run: every arm scored without an error"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# Example paths the recording models wrote in usage text and READMEs (`/path/to/source`), each read and
+# confirmed to name nothing real. One "allow <regex>" per line; check-session.ts --allow blanks them before
+# its path scan. Add a line only after reading the passage it comes from. A "length <name>:<line>" line excuses one
+# reviewed answer cut at the output limit (bottom of this file).
+# csv-toolkit: a regex literal in a test (`assert.throws(/unterminated/i)`) and in prose (`/foo/.test(text)`).
+allow /unterminated/i
+allow /foo/\.test
+# csv-toolkit: the model mistyped its own sandbox directory (/work/csv for /work/csv-toolkit) in edit calls.
+allow /work/csv/cli\.ts
+# ts-kv: the server's own HTTP routes (/kv/<key>), an example temp-file name in a summary, and a relative
+# import (`../src/server.ts`) and two placeholders (`node <path>/src/server.ts`, `file://…/src/server.ts`) the path scan reads from a slash.
+allow /kv/[A-Za-z0-9._~%/-]*
+allow /data/kv\.json\.12345\.tmp
+allow (\.\.|<path>|…)/src/server\.ts
+# sh-backup: README and usage examples (`/path/to/source`, `/data/mydb` -> `/backups/mydb`, `/data/site`), the
+# systemd unit's placeholder install path and its sed example, test fixtures under the test's own tmpdir
+# (`source/data/file1.txt`, `/nonexistent/source`), reasoning examples (`/a/b/c`, `/foo/bar/`), and
+# systemd-analyze's own error inside the sandbox ("Failed to create directory '/run/systemd/'").
+allow /path/(to(/[A-Za-z0-9._-]*)*/?|\.\.\.)
+allow /(data|backups)/(mydb|site)(/[A-Za-z0-9._-]+)?
+allow /backups\b
+allow /opt/sh-backup/bin/backup\.sh
+allow /srv/data|/var/backups
+allow /source(/data)?(/file[12]\.txt)?/?
+allow /nonexistent/source
+allow /a/b(/c)?
+allow /foo/bar/?
+allow /run/systemd/?
+
+# ts-logstat: request paths in the generated access-log fixtures, tests and reports (/api/orders, /img/logo.png,
+# /blog/post-1), a path.resolve example in reasoning (/work/src/cli.ts), a relative fixture path read from a slash
+# (../fixtures/big.log), and a probe for version managers in the sandbox (/opt/nvm).
+allow /(api/(orders|users)|img/logo\.png|images/logo\.png|assets/(app\.js|main\.css|bundle\.js)|js/app\.js|css/site\.css|blog/post-1)\b
+allow /work/src/cli\.ts
+allow /fixtures/big\.log
+allow /opt/nvm
+
+# Reviewed cuts (docs/evaluation.md, "Cut turns"): sh-backup and ts-logstat answers where the model drafted a whole script or
+# README inside its reasoning and reached the 16,384-token output limit before writing any visible text. Every
+# compactor replays the same transcript, so a cut favours none of them.
+length sh-backup:164
+length sh-backup:302
+length sh-backup:309
+length ts-logstat:321

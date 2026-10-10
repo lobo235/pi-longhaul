@@ -1,0 +1,73 @@
+{
+  "about": "Ground truth for the scorer's labeled measures, written by hand from each scenario and its recording; never derived from either compactor's detector. rules: the standing rules the user gave (at = the user message, quote = a verbatim part of it, marker = a case-insensitive regular expression that a rule line holding this rule matches, liftedAt = the user message that withdrew or replaced it). values: values a later turn depends on (learnedAt = the turn whose reply first gave it, usedAt = the turn that needs it again, value = the accepted spellings, history = true when only the conversation holds it, false when the workspace still does).",
+  "sessions": {
+    "csv-toolkit": {
+      "rules": [
+        { "at": "u2", "quote": "Never add npm dependencies to this project.", "marker": "npm" },
+        { "at": "u7", "quote": "paste the summary line (tests, pass, fail) at the end of your reply", "marker": "summary", "liftedAt": "u18" },
+        { "at": "u14", "quote": "Don't use regular expressions anywhere in the parser", "marker": "regular expression|regex" }
+      ],
+      "values": [
+        { "name": "the first benchmark time", "value": ["166 ms", "166ms", "165.7 ms", "165.7ms"], "learnedAt": "u10", "usedAt": "u13", "history": true },
+        { "name": "the quoted-fields commit", "value": ["2eab582"], "learnedAt": "u4", "usedAt": "u21", "history": false }
+      ]
+    },
+    "py-ledger": {
+      "rules": [
+        { "at": "u2", "quote": "Always store amounts as integer cents, never as floats.", "marker": "cents" },
+        { "at": "u5", "quote": "Use only the Python standard library in this project", "marker": "standard library|stdlib|pip" },
+        { "at": "u9", "quote": "Every function must have type hints", "marker": "type hint" },
+        { "at": "u19", "quote": "keep it for the ledger package itself", "marker": "ledger package" }
+      ],
+      "values": [
+        { "name": "the March total", "value": ["2768.48", "-2768.48", "−2768.48", "276848"], "learnedAt": "u12", "usedAt": "u21", "history": false }
+      ]
+    },
+    "py-mdtoc": {
+      "rules": [
+        { "at": "u3", "quote": "Don't use regular expressions for parsing the headings", "marker": "regular expression|regex" },
+        { "at": "u6", "quote": "Use only the Python standard library, for tests as well.", "marker": "standard library|stdlib" },
+        { "at": "u10", "quote": "The CLI must never modify a file unless --write is given", "marker": "--write" }
+      ],
+      "values": [
+        { "name": "the first CLI time on the 5,000-heading document", "value": ["16 ms", "16ms"], "learnedAt": "u12", "usedAt": "u19", "history": true }
+      ]
+    },
+    "sh-backup": {
+      "rules": [
+        { "at": "u2", "quote": "Always start every script with set -euo pipefail", "marker": "pipefail" },
+        { "at": "u6", "quote": "Never delete anything outside the destination directory", "marker": "outside|(delet|rotat)[^\\n]*(dest|pattern|scoped)" },
+        { "at": "u10", "quote": "Every dry-run line must start with DRY:", "marker": "DRY:", "liftedAt": "u20" }
+      ],
+      "values": [
+        { "name": "the archive name format", "value": ["YYYYMMDD-HHMMSS.tar.gz"], "learnedAt": "u3", "usedAt": "u19", "history": false }
+      ]
+    },
+    "ts-logstat": {
+      "rules": [
+        { "at": "u2", "quote": "Use tabs for indentation in every TypeScript file in this project.", "marker": "use tabs|tabs for indentation|keep tabs", "liftedAt": "u17" },
+        { "at": "u4", "quote": "Tests go under tests/, one file per module in src/", "marker": "tests go under|one file per module" },
+        { "at": "u6", "quote": "Commit messages in this project start with a lowercase verb", "marker": "lowercase verb", "liftedAt": "u20" },
+        { "at": "u8", "quote": "every new CLI option gets a row in a README.md options table", "marker": "options table" },
+        { "at": "u12", "quote": "Our production servers run Node 22.11", "marker": "22\\.11" },
+        { "at": "u15", "quote": "keep tabs in the TypeScript files", "marker": "keep tabs|tab rule", "liftedAt": "u17" },
+        { "at": "u17", "quote": "Switch the TypeScript files to two-space indentation instead of tabs from here on", "marker": "two-space|2-space|two spaces" }
+      ],
+      "values": [
+        { "name": "the first commit hash given", "value": ["edfab42"], "learnedAt": "u1", "usedAt": "u23", "history": false },
+        { "name": "the first median time", "value": ["153 ms", "153ms"], "learnedAt": "u10", "usedAt": "u18", "history": true }
+      ]
+    },
+    "ts-kv": {
+      "rules": [
+        { "at": "u3", "quote": "Every error response must be JSON of the form", "marker": "envelope|\\{\\s*\"?error\"?\\s*:" },
+        { "at": "u5", "quote": "Never add npm dependencies", "marker": "npm" },
+        { "at": "u9", "quote": "Read the port from the KV_PORT environment variable", "marker": "KV_PORT" }
+      ],
+      "values": [
+        { "name": "the first port", "value": ["8090"], "learnedAt": "u2", "usedAt": "u18", "history": true },
+        { "name": "the first load-test throughput", "value": ["13,157", "13157"], "learnedAt": "u12", "usedAt": "u20", "history": true }
+      ]
+    }
+  }
+}

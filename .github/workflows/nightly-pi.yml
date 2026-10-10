@@ -1,0 +1,113 @@
+name: nightly-pi
+
+# Tests Longhaul against the newest pi on npm. A pass on a pi outside every verified release line opens a pull
+# request recording it in pi-compat.json; a failure opens an issue. Neither merges or publishes anything.
+# The job that installs and runs the new pi has a read-only token; only the reporting job can write, and it
+# installs nothing and runs no package scripts.
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-pi
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pi.outputs.version }}
+      status: ${{ steps.pi.outputs.status }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+
+      - name: Find the newest pi and how it relates to pi-compat.json
+        id: pi
+        run: |
+          version="$(npm view @earendil-works/pi-coding-agent version)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "unexpected version: $version" >&2; exit 1; fi
+          status="$(node --input-type=module -e "import { piVersionStatus, readPiCompat } from './src/pi-compat.ts'; console.log(piVersionStatus(process.argv[1], readPiCompat()))" "$version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "newest pi $version: $status"
+
+      - name: Install it
+        if: steps.pi.outputs.status != 'exact'
+        env:
+          PI_VERSION: ${{ steps.pi.outputs.version }}
+        run: npm install --save-dev --save-exact "@earendil-works/pi-coding-agent@${PI_VERSION}"
+
+      - name: Test against it (the version gate skipped)
+        if: steps.pi.outputs.status != 'exact'
+        run: |
+          npm run typecheck
+          node --test --test-skip-pattern="the vendored pi is on a release line" "src/**/*.test.ts"
+          npm run load-smoke
+          npm run smoke
+
+  record:
+    needs: test
+    if: needs.test.outputs.status == 'unverified'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PI_VERSION: ${{ needs.test.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Open a pull request recording it
+        run: |
+          branch="nightly/pi-${PI_VERSION}"
+          # Keyed on the pull request, not the branch: when creating it fails (the repository does not allow
+          # Actions to open pull requests), the branch is already pushed, and a branch check would turn every
+          # later night into a silent success. A pull request in any state, closed included, means a maintainer
+          # has seen this version.
+          if [ "$(gh pr list --head "$branch" --state all --json number --jq length)" != "0" ]; then echo "a pull request for $branch exists"; exit 0; fi
+          if ! git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            npm install --package-lock-only --ignore-scripts --save-dev --save-exact "@earendil-works/pi-coding-agent@${PI_VERSION}"
+            node scripts/record-pi-version.ts "$PI_VERSION"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git switch -c "$branch"
+            git add package.json package-lock.json pi-compat.json
+            git commit -m "pi-compat: record pi ${PI_VERSION} (nightly)"
+            git push origin "$branch"
+          fi
+          gh pr create --head "$branch" --title "Record pi ${PI_VERSION}" --body "The nightly job ran the unit suite, the load smoke and one real compaction (fake model) on pi ${PI_VERSION}, and all passed. Before merging, run the live check in CONTRIBUTING.md (*Verifying a new pi version*) with a real model. Close and reopen this pull request to start CI on it: a pull request opened by the workflow token does not trigger workflows."
+
+  report-failure:
+    needs: test
+    if: failure() && needs.test.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PI_VERSION: ${{ needs.test.outputs.version }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Open an issue unless one is open
+        run: |
+          title="Nightly: Longhaul fails on pi ${PI_VERSION}"
+          open="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq 'length')"
+          if [ "$open" = "0" ]; then
+            gh issue create --title "$title" --body "The nightly run against pi ${PI_VERSION} failed: ${RUN_URL}. Until it is fixed, add it to the README's *Known issues*."
+          fi

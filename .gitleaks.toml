@@ -1,0 +1,12 @@
+# gitleaks configuration for CI: the default rules, plus the three test files whose fixtures are synthetic
+# credentials on purpose (they test the credential filter, security.md T3). Nothing else is exempt.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic credentials that exercise the credential filter"
+paths = [
+  '''(^|/)src/learned\.test\.ts$''',
+  '''(^|/)src/store/output\.test\.ts$''',
+  '''(^|/)src/narrative/named-values\.test\.ts$''',
+]

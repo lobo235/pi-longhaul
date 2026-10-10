@@ -1,0 +1,26 @@
+name: Feature request
+description: Something Longhaul should do that it does not.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the README's *Roadmap* first. Describe the problem before the solution: what goes wrong for you
+        today, and how you would know it was fixed. **Do not paste transcripts or logs**; describe their shape.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What happens today that should not, or what you cannot do.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

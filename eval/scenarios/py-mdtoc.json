@@ -1,0 +1,31 @@
+{
+  "name": "py-mdtoc",
+  "description": "A Python Markdown table-of-contents generator, from an empty directory. Rules: no regular expressions for heading parsing (u3), only the standard library (u6), the CLI must not modify a file without --write (u10). Values reused later: the anchor rule chosen (u5, u17), commit hashes (u8, u15, u22), the size of the benchmark document (u12, u19).",
+  "turns": [
+    "Let's write a Markdown table-of-contents generator in Python 3 in this empty directory. Start with git init, a mdtoc/ package with a function that returns the ATX headings (lines starting with #) of a document as (level, text) pairs, and tests run with python3 -m unittest. Run them.",
+    "Skip headings inside fenced code blocks, both ``` and ~~~ fences, and add tests for each.",
+    "Don't use regular expressions for parsing the headings; plain string methods only.",
+    "Add a function that renders the headings as a nested bulleted list of links, indenting two spaces per level below the top level present.",
+    "Generate anchors the way GitHub does: lowercase, spaces to hyphens, punctuation dropped, and -1, -2 suffixes for duplicates. Tell me in one sentence which rule you implemented for punctuation.",
+    "Use only the Python standard library, for tests as well.",
+    "Add a CLI, python3 -m mdtoc FILE, that prints the table of contents.",
+    "Commit this with a short message and tell me the hash.",
+    "Support <!-- toc --> and <!-- tocstop --> markers: the CLI replaces whatever is between them with a fresh table of contents.",
+    "The CLI must never modify a file unless --write is given; without it, print the updated document to stdout.",
+    "Add --min-level and --max-level options to limit which heading levels appear.",
+    "Generate a large test document of about 5,000 headings with scripts/gen_doc.py, time the CLI on it, and tell me the time and the file size.",
+    "Handle setext headings (a line underlined with === or ---) as levels 1 and 2, and make sure a --- after a blank line is still a horizontal rule.",
+    "Strip inline Markdown from heading text before making anchors: emphasis, inline code and links keep just their text.",
+    "Commit this and give me the hash.",
+    "Add a --check option that exits 1 when the table of contents between the markers is out of date, for use in CI.",
+    "Which punctuation rule did we pick for anchors earlier? Check the anchor tests still cover it.",
+    "Add tests for headings with emoji and non-ASCII letters and make sure anchors keep the letters.",
+    "Rerun the benchmark on the 5,000-heading document and compare it with the earlier time.",
+    "Write a README.md with the options and one example each.",
+    "Add a pre-commit hook example under examples/ that runs the --check option on README.md.",
+    "Run the full test suite, commit with a message listing the options, and give me the hash.",
+    "Show me git log --oneline and tell me which commit added the marker support.",
+    "Run the CLI with --write on the README itself after adding markers to it, and show me the diff.",
+    "Final pass: list the rules I gave you during this session and check the code against each one."
+  ]
+}

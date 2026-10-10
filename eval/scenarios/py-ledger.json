@@ -1,0 +1,31 @@
+{
+  "name": "py-ledger",
+  "description": "A Python household ledger on sqlite3, from an empty directory. Rules: amounts as integer cents (u2), only the standard library (u5), type hints on every function (u9, lifted at u19). Values reused later: the schema version (u6, u16), commit hashes (u8, u15, u23), the March total (u12, u21).",
+  "turns": [
+    "Let's write a small household ledger in Python 3 in this empty directory. Start with git init, a ledger/ package, and ledger/db.py that opens a sqlite3 database and creates a transactions table with id, date, description, category and amount. Add tests under tests/ that run with python3 -m unittest, and run them.",
+    "Always store amounts as integer cents, never as floats. Parse user input like 12.34 into 1234 with exact decimal handling.",
+    "Add ledger/cli.py with an add command: python3 -m ledger.cli add 2026-03-04 \"Groceries\" food 54.20. Test it end to end with a temporary database file.",
+    "Add a list command that prints transactions for a month, newest first, with amounts formatted back to two decimals.",
+    "Use only the Python standard library in this project: no pip packages, not even for tests.",
+    "Add a schema_version table and set the version to 1. Write the migration code so that opening an older database upgrades it. Tell me the version number you stored.",
+    "Generate a sample data file, fixtures/march.csv, with about 40 transactions across food, rent, transport and fun for March 2026, and add an import command that loads it.",
+    "Commit everything so far with a short message and tell me the hash.",
+    "Every function must have type hints, parameters and return values both. Go through the existing code and add any that are missing.",
+    "Add a report command that prints the total per category for a month and a grand total at the bottom.",
+    "Make the report command handle a month with no transactions by printing a short message in place of an empty table, and add a test.",
+    "Import the March fixture into a fresh database and run the report for March 2026. What is the grand total?",
+    "Add a budget table (category, monthly limit in cents) and a set-budget command. The report should show the remaining budget next to each category.",
+    "Bump the schema to version 2 for the budget table, with a migration from version 1, and a test that opens a version 1 database and checks it was upgraded.",
+    "Commit this and give me the hash.",
+    "Which schema version did we start with, and what did the first migration add?",
+    "Add an export command that writes a month's transactions to CSV with the standard csv module, and a round-trip test with import.",
+    "The import command should skip rows it has already imported. Use a hash of date, description and amount to detect duplicates, and test it by importing the March fixture twice.",
+    "The type hint rule is lifted for test files; keep it for the ledger package itself.",
+    "Add a --json flag to the report command that prints the same numbers as a JSON object.",
+    "Run the March report again after the duplicate-import fix. Does the grand total still match the number you gave me earlier?",
+    "Write a README.md with the commands and one example each.",
+    "Run the full test suite, commit with a message listing the commands, and give me the hash.",
+    "Show me git log --oneline and tell me which commit introduced the budget table.",
+    "Final pass: list the rules I gave you during this session and check the code against each one."
+  ]
+}

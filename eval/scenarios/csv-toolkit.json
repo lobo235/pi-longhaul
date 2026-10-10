@@ -1,0 +1,31 @@
+{
+  "name": "csv-toolkit",
+  "description": "A TypeScript CSV parser and CLI built from an empty directory. Rules: no npm dependencies (u2), the test summary line at the end of every reply (u7, lifted at u18), no regular expressions in the parser (u14). Values reused later: commit hashes (u4, u11, u21), the benchmark time (u10, u13).",
+  "turns": [
+    "Let's build a small CSV toolkit in TypeScript in this empty directory. Node 22 and later run .ts files directly, so there is no build step. Start with git init, a package.json whose test script runs node --test, and src/parse.ts that splits simple comma-separated lines into fields. Add a test file and run it.",
+    "Never add npm dependencies to this project. The Node standard library is enough for everything we do here.",
+    "Now handle quoted fields: a field in double quotes can contain commas, and two double quotes inside it stand for one. Add tests for both cases and run them.",
+    "Commit what we have with a short message and tell me the commit hash.",
+    "Add support for CRLF line endings and for a last line with no trailing newline. Tests first, then the code.",
+    "Write src/cli.ts: it reads the CSV file named by its first argument and prints it as a JSON array of objects, using the header row for keys. Try it on a small sample file you create under fixtures/.",
+    "Always run the whole test suite after every change and paste the summary line (tests, pass, fail) at the end of your reply.",
+    "Add a --delimiter option to the CLI so semicolon-separated files work too.",
+    "What does the CLI print for an empty file? Make it print [] and exit 0, and add a test.",
+    "Measure how long parsing takes on a generated file with 200,000 rows of 6 columns. Write the generator as scripts/gen.ts and report the time in milliseconds.",
+    "Commit this as well and give me the hash.",
+    "Fields with a newline inside quotes break the line splitter. Rewrite the parser as a character-by-character state machine so quoted newlines work. Keep the existing tests green.",
+    "Rerun the 200,000-row benchmark and compare it with the earlier number.",
+    "Don't use regular expressions anywhere in the parser; I want it to stay a plain loop.",
+    "Add src/stringify.ts that writes rows back to CSV, quoting a field when it contains the delimiter, a double quote or a newline. Add a round-trip test: parse(stringify(rows)) equals rows.",
+    "Add a --select option to the CLI that keeps a comma-separated list of columns, in the order given.",
+    "Show me git log --oneline so I can see the history so far.",
+    "The rule about pasting the test summary at the end of every reply is lifted. Mention test results when something fails.",
+    "Add a --types flag: fields that look like integers or decimals become JSON numbers, and true/false become booleans. Leave everything else as strings.",
+    "Write a README.md describing the CLI options with one example each.",
+    "Go back to the commit you made after the quoted-field work and tell me which files it touched.",
+    "Add a --stats flag that prints the row count and, for each column, how many values are empty.",
+    "Run the full test suite, then commit with a message summarising the CLI options, and give me the hash.",
+    "Check that the parser still handles the semicolon delimiter with quoted fields containing semicolons; add a test if one is missing.",
+    "Final pass: list the rules I gave you during this session that the code should follow, and check the code against each one."
+  ]
+}

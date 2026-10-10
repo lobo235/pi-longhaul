@@ -1,0 +1,31 @@
+{
+  "name": "ts-logstat",
+  "description": "A TypeScript access-log summarizer CLI, from an empty directory, written to defeat a word-list rule detector. Rules with no rule-shaped word: tab indentation (u2, partly lifted at u15, replaced at u17), the tests/ layout (u4), lowercase-verb commit messages given inside a task (u6, lifted in other words at u20), compatibility with Node 22.11 stated as a fact (u12). A rule inside a task message: a README options-table row for every new option (u8). The replacing rule at u17 says 'instead'. One-offs that do use rule-shaped words: u5 (don't), u11 (never mind, instead), u16 (always, a question). Values only the history holds: the first commit hash (u6, used at u23), the first median time (u10, compared at u18).",
+  "turns": [
+    "Let's build logstat, a small TypeScript CLI that summarizes web server access logs, in this empty directory. Node 22 and later run .ts files directly, so there is no build step. Start with git init, a package.json whose test script runs node --test, and src/parse.ts that parses one line of the common log format into an object with ip, time, method, path, status and bytes. Add a test and run it.",
+    "Use tabs for indentation in every TypeScript file in this project.",
+    "Add src/stats.ts that counts requests per status code and per path from a list of parsed lines, with tests for both counts.",
+    "Tests go under tests/, one file per module in src/, named after it: tests/parse.test.ts for src/parse.ts. Move the existing ones there and make the test script find them.",
+    "Don't commit yet; first show me git status and git diff --stat so I can see what will go in.",
+    "Commit it now. Commit messages in this project start with a lowercase verb, like 'add parser and stats'. Tell me the commit hash.",
+    "Write src/cli.ts: it reads the log file named by its first argument and prints the status and path counts as JSON. Try it on a small fixture you write by hand under fixtures/.",
+    "Add a --top N option that keeps only the N most frequent paths. And from now on every new CLI option gets a row in a README.md options table; create the README with that table now.",
+    "Write scripts/gen.ts that writes fixtures/big.log with 100,000 lines of random paths, statuses and sizes, from a fixed seed so every run writes the same file. Run it.",
+    "Time the CLI on fixtures/big.log, three runs, and tell me the median in milliseconds.",
+    "Never mind the timing for now. Make the parser skip malformed lines instead of throwing, and report how many it skipped in the JSON output.",
+    "Our production servers run Node 22.11, so everything here has to work on that version; check what you've used so far against it.",
+    "Commit this as well and give me the hash.",
+    "Add a --since option that takes an ISO date and ignores lines before it. Tests first, then the code.",
+    "The tab rule doesn't apply to the JSON files or package.json; keep tabs in the TypeScript files.",
+    "Is the log always going to arrive in time order? Check what the generator writes and tell me what --since does with lines out of order.",
+    "Switch the TypeScript files to two-space indentation instead of tabs from here on, and convert the existing files.",
+    "Time the CLI on fixtures/big.log again, three runs, and compare the median with the first one you measured.",
+    "Add a --format option: json (the default) or table, where table prints aligned columns.",
+    "Forget what I said about commit message style; any message is fine from here on.",
+    "Run the whole test suite and show me the summary line.",
+    "Commit everything and give me the hash.",
+    "Go back to the commit whose hash you gave me first and show me which files it had, with git show --stat.",
+    "Add a --status option that keeps only lines with the given status code.",
+    "Final pass: list the rules for this project that are still in force, and check the code and the README against each one."
+  ]
+}

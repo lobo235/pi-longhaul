@@ -1,0 +1,72 @@
+{
+  "name": "pi-longhaul",
+  "version": "0.0.0",
+  "description": "Longhaul, a state compactor for pi: carries a verified Session state across compactions instead of a rewritten summary.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lobo235/pi-longhaul.git"
+  },
+  "homepage": "https://github.com/lobo235/pi-longhaul#readme",
+  "bugs": {
+    "url": "https://github.com/lobo235/pi-longhaul/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "compaction",
+    "coding-agent"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "!src/**/test-support.ts",
+    "!src/score/",
+    "!src/state-cli.ts",
+    "fixtures/",
+    "pi-compat.json",
+    "config.example.json",
+    "CONTEXT.md",
+    "CHANGELOG.md",
+    "docs/setup-with-an-agent.md",
+    "docs/security.md",
+    "docs/evaluation.md",
+    "docs/adr/",
+    "docs/how-it-works.md"
+  ],
+  "scripts": {
+    "test": "npm run typecheck && node --test \"src/**/*.test.ts\" \"eval/**/*.test.ts\" \"scripts/**/*.test.ts\" && npm run load-smoke",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "load-smoke": "node load-smoke.mjs",
+    "state": "node src/state-cli.ts",
+    "segments": "node src/score/segments-cli.ts",
+    "replay": "node src/score/replay-cli.ts",
+    "facts": "node src/score/facts-cli.ts",
+    "score": "pi --no-session --model ${SCORE_MODEL:?set SCORE_MODEL=provider/model-id[:thinking]} -e ./src/score/score-run.ts",
+    "evidence": "pi --no-session --model ${SCORE_MODEL:?set SCORE_MODEL=provider/model-id} -e ./src/score/evidence-run.ts",
+    "smoke": "node scripts/compaction-smoke.ts",
+    "check-pack": "node scripts/check-pack.ts"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.0.4",
+    "@types/node": "^24.0.0",
+    "typebox": "1.3.7",
+    "typescript": "5.9.3"
+  },
+  "author": "Justin Barlow"
+}

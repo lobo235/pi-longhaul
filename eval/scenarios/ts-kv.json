@@ -1,0 +1,31 @@
+{
+  "name": "ts-kv",
+  "description": "A TypeScript key-value HTTP server on node:http, from an empty directory. Rules: errors as a JSON envelope (u3), no npm dependencies (u5), port from an environment variable never hard-coded (u9). Values reused later: the port (u2, u18), commit hashes (u7, u14, u22), the load-test throughput (u12, u20).",
+  "turns": [
+    "Let's build a small key-value store served over HTTP, in TypeScript with node:http, in this empty directory. Node 22 and later run .ts files directly. Start with git init, a package.json whose test script runs node --test, and src/store.ts with an in-memory Map behind get, set and delete functions. Test and run it.",
+    "Add src/server.ts: GET /kv/:key returns the value, PUT /kv/:key stores the request body, DELETE /kv/:key removes it. Listen on port 8090 for now. Add tests that start the server on a random port and use fetch.",
+    "Every error response must be JSON of the form {\"error\": {\"code\": \"...\", \"message\": \"...\"}}, with a proper HTTP status. Update the 404 for a missing key to follow it.",
+    "Limit values to 64 KiB: a larger PUT gets a 413 in the error envelope. Add a test.",
+    "Never add npm dependencies; the standard library is enough.",
+    "Add a TTL: PUT accepts a ttl query parameter in seconds, and expired keys behave as missing. Make the clock injectable so the tests run without sleeping.",
+    "Commit what we have with a short message and tell me the hash.",
+    "Add GET /kv returning the list of keys, with an optional prefix query parameter.",
+    "Read the port from the KV_PORT environment variable and fail at startup with a clear message when it is missing; don't hard-code it anywhere, including the README later.",
+    "Add persistence: on shutdown (SIGTERM or SIGINT) write the store to a JSON file named by KV_DATA_FILE, and load it on startup. Expired keys are not written.",
+    "Write a load test as scripts/load.ts that sends 20,000 PUT and GET requests with 50 in flight, against a server you start in the same process.",
+    "Run the load test and tell me the requests per second.",
+    "Add an ETag to GET responses and support If-None-Match with a 304.",
+    "Commit this and give me the hash.",
+    "Add compare-and-set: a PUT with an If-Match header succeeds when the current ETag matches and gets 412 in the error envelope otherwise.",
+    "Write the persistence file atomically: write to a temporary file in the same directory and rename it.",
+    "Add a /healthz endpoint that returns {\"ok\": true, \"keys\": <count>}.",
+    "Which port did we use at the very start, and where does the port come from now?",
+    "Add request logging to stderr: method, path, status and duration in milliseconds, one line each, and a --quiet flag that turns it off.",
+    "Run the load test again with logging on and compare the throughput with the earlier number.",
+    "Write a README.md with the endpoints, the environment variables and a curl example for each endpoint.",
+    "Run the full test suite, commit with a message listing the endpoints, and give me the hash.",
+    "Show me git log --oneline and tell me which commit added the TTL.",
+    "Check that every error path in the server uses the JSON error envelope; list any that miss it and fix them.",
+    "Final pass: list the rules I gave you during this session and check the code against each one."
+  ]
+}
