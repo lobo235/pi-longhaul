@@ -1,41 +1,84 @@
 # Longhaul
 
-**A state compactor for [pi](https://github.com/earendil-works/pi).**
+![Longhaul against pi's own compaction: what the model sees after a compaction (a new ~5k-token summary plus replayed old reasoning, against a state under 3.4k tokens and room for work), the same small state at compaction 1 and 90, and how each compaction works: code writes the facts, the model answers one checked diff, the next span starts clean](https://raw.githubusercontent.com/lobo235/pi-longhaul/main/.github/assets/infographic.png)
 
-> Set it up with your agent: tell it *"Read
+**Keep a pi session working all night.** Longhaul is a compactor for [pi](https://github.com/earendil-works/pi)
+that carries your session forward instead of rewriting it: your rules stay in your own words, most of the state
+is written by code, the model's old reasoning is left behind, and a compaction takes seconds instead of a minute.
+
+```
+pi install npm:pi-longhaul
+```
+
+> Or set it up with your agent: tell it *"Read
 > https://raw.githubusercontent.com/lobo235/pi-longhaul/main/docs/setup-with-an-agent.md and follow it."*
 > It checks your setup read-only, asks one question at a time, and changes nothing without showing you the diff.
 
-When a pi session fills its context, pi compacts it: a model rewrites the conversation, previous summary
+**Against pi's own compaction**, on the same sessions, the same local 27B reasoning model and the same settings
+([docs/evaluation.md](docs/evaluation.md)):
+
+| over 76 compactions in 6 sessions | Longhaul | pi's own |
+|---|---|---|
+| your standing rules still in force | **220 of 227** | 187 of 227 |
+| values the session needed again (timings, totals, ports) | **8 of 9** | 6 of 9 |
+| rules you withdrew, dropped | **32 of 33** | 31 of 33 |
+| the session's goal, kept | 76 of 76 | 76 of 76 |
+| time per compaction (median) | **10 s** | 54 s |
+| output tokens per compaction (mean) | **918** | 5,063 |
+
+## Why Longhaul
+
+Longhaul was built for sessions nobody watches: pi running through the night on a locally hosted open-weight
+model, compacting again and again, and expected to still be doing the right thing in the morning. pi's own
+compaction was not made for that, in four ways.
+
+**The summary is rewritten every time.** pi asks a model to rewrite the whole conversation, previous summary
 included, as prose. Over a long session that becomes a summary of a summary of a summary. Your rules come back
 paraphrased, decisions lose the evidence they rested on, and whatever one rewrite drops is gone for good.
 
-Longhaul replaces that summary with a **Session state** that is carried forward rather than rewritten:
+**The model's old reasoning comes along.** After a compaction pi keeps the newest ~20k tokens of the
+conversation verbatim, reasoning blocks included (they even count toward that budget), and sends them on every
+request until the next compaction; its summarizer reads all of that reasoning too. In one of our overnight
+sessions the kept window held, on average over 20 compactions, 57k characters of the model's old
+chain-of-thought against 2.2k characters of what it had actually said. After each compaction the model
+restarted from pages of its own stale reasoning. Those nights also produced long loops of *"Let me do it."*
+that never did it. Part of that loop is how the model samples at higher thinking levels, which no compactor
+can fix, but a fresh start should not hand the model its old reasoning to circle on.
 
-- **Your corrections, verbatim.** A standing rule you gave ("never use mocks; fakes only") is kept in your own
-  words, with the message it came from, until you withdraw it ("the no-mocks rule no longer applies"). A
-  one-time permission ("go ahead and use a mock here") leaves the rule standing.
-- **Facts written by code.** Commands and their exit codes, errors, the files read and modified, the git branch
-  and tree at compaction, and values the session learned are recorded by code, not remembered by a model. A
-  value the summarizer names (a timing, a total) is kept only when code finds it, verbatim, in the turn it
-  cites.
-- **A verified diff from the model.** The model is asked only for what code cannot know (corrections,
-  decisions and dead ends with their evidence, what is in progress and next) as a small JSON diff, and every
-  quote and evidence id in it is checked before anything is accepted.
-- **Bounded size.** The state is rendered under fixed caps (about 3.4k tokens at most), however long the
-  session runs.
+**Compaction is slow, and it is a model's guess.** The summary is generated at the session's thinking level, up
+to about 13k output tokens, on every compaction. On a local model that is a minute or more of a stalled session
+each time, and everything in the summary, down to the file names and exit codes, is whatever the model chose to
+write.
+
+**The summary competes with the work.** Every token of summary and of replayed reasoning is a token the next
+span cannot use for actual work, and a rewritten summary grows with the session.
+
+Longhaul answers each of these:
+
+- **Carried, not rewritten.** The Session state is updated with a diff, so nothing earlier is paraphrased
+  again. A standing rule you gave ("never use mocks; fakes only") is kept in your own words, copied from your
+  message by code, until you withdraw it ("the no-mocks rule no longer applies"). A one-time permission ("go
+  ahead and use a mock here") leaves the rule standing.
+- **Old reasoning left behind.** The kept window is handed over without the reasoning the state already
+  superseded, so the next span starts from the state and recent tool input and output, as a fresh prompt would
+  (*Old reasoning in the kept window*).
+- **Mostly deterministic.** Commands and their exit codes, errors, the files read and modified, the git branch
+  and tree, and values the session learned are written by code from the transcript. The model is asked only for
+  what code cannot know (rule labels, decisions and dead ends with their evidence, what is in progress and
+  next) as one small JSON diff, and every quote and evidence id in it is checked before anything is accepted.
+  That is why a compaction takes seconds and a fifth of the output tokens.
+- **Small and bounded.** The state is rendered under fixed caps, about 3.4k tokens at most, however long the
+  session runs. The 90th compaction hands over a state the same size as the first, and the rest of the window
+  is left for work. The maintainer's longest session so far ran more than 90 compactions without a restart.
 - **Nothing lost, only retired.** What no longer fits stays on the transcript, and the model fetches it back
   with `longhaul_recall`.
 - **Your conversation stays where you sent it.** The summarizer runs on the session's own model unless you
   configure otherwise. No telemetry, ever.
 
-Whether this gives better sessions than pi's own compaction is measured, not assumed. On the published
-synthetic sessions with a local 27B reasoning model, Longhaul kept 220 of 227 labeled user rules in force
-against pi's 187 (226 against 211 in an earlier run), 8 of 9 labeled values against 6, and the session's goal
-in every state, at about a fifth of the compaction time and output tokens. pi's own summary carried more
-identifiers read from source files, and when Longhaul takes over a session pi has already compacted it keeps
-fewer of the values pi's summary carried and drops fewer of the rules withdrawn before it. [docs/evaluation.md](docs/evaluation.md) has the method and every
-measure, including where pi's own does better.
+Where pi's own compaction does better is measured too. Its wide summary names more identifiers read from source
+files, and when Longhaul takes over a session pi has already compacted, it keeps fewer of the values pi's
+summary carried and drops fewer of the rules withdrawn before the switch. [docs/evaluation.md](docs/evaluation.md)
+has the method and every measure.
 
 ## What the state looks like
 
@@ -342,7 +385,10 @@ newest pi and opens an issue when it breaks.
 Each item is a GitHub issue labelled [`roadmap`](https://github.com/lobo235/pi-longhaul/issues?q=is%3Aissue+label%3Aroadmap); there are no dates.
 
 - [Summarize from the session's own warm request](https://github.com/lobo235/pi-longhaul/issues/6) (prefix-cache reuse), pending a way to repeat pi's request.
-- [Carry more of the values a session will need again](https://github.com/lobo235/pi-longhaul/issues/7), where pi's own summary does better today.
+- [Take over a session pi already compacted without losing what its summary carried](https://github.com/lobo235/pi-longhaul/issues/19):
+  values and withdrawn rules, where pi's own compaction does better today.
+- [Carry more of the values a session will need again](https://github.com/lobo235/pi-longhaul/issues/7): pi's wide
+  summary still names more facts read from tool output.
 - [Caps that scale with the context window](https://github.com/lobo235/pi-longhaul/issues/8).
 - [`turns` mode as a tested, gated option](https://github.com/lobo235/pi-longhaul/issues/9).
 - [A project-level config limited to harmless keys](https://github.com/lobo235/pi-longhaul/issues/10).
@@ -371,7 +417,7 @@ a minor version. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - [docs/adr/](docs/adr/): the decisions behind the design.
 - [docs/evaluation.md](docs/evaluation.md): how Longhaul is measured against pi's own compaction.
 - [docs/security.md](docs/security.md): the threat model.
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- [CONTRIBUTING.md](https://github.com/lobo235/pi-longhaul/blob/main/CONTRIBUTING.md), [SECURITY.md](https://github.com/lobo235/pi-longhaul/blob/main/SECURITY.md), [CODE_OF_CONDUCT.md](https://github.com/lobo235/pi-longhaul/blob/main/CODE_OF_CONDUCT.md).
 
 ## License
 

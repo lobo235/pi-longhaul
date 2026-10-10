@@ -30,6 +30,8 @@ Read [CONTEXT.md](CONTEXT.md) before naming anything. The code uses those words 
 
 ## Making the change
 
+- **The pull request title** becomes the squash commit's subject: `area: summary`, in the imperative or as a
+  statement of the new behaviour (`render: keep the Goal line once the Request moves`).
 - **Tests first**, one behaviour at a time, through the public function. Fakes over mocks:
   `src/test-support.ts` has a fake pi.
 - **Fixtures are synthetic.** No real transcript, log, hostname, IP address, user name or key, even redacted.
@@ -69,7 +71,7 @@ step 3 is still a maintainer's to run before merging.
 ## Releasing (maintainers)
 
 1. Set `version` in `package.json` (and the lockfile: `npm install --package-lock-only`). A version with a
-   `-` (`1.0.0-rc.1`) is published under the `next` dist-tag, anything else under `latest`.
+   `-` (`1.0.0-rc.1`) is published under the `next` dist-tag, anything else under `latest`. Point `pi.image` in `package.json` at the new tag too: the release job checks it.
 2. Rename `## [Unreleased]` in `CHANGELOG.md` to `## [vX.Y.Z] - YYYY-MM-DD`, with the `v`: the release job
    checks for it. Put a fresh empty `## [Unreleased]` above it.
 3. Merge to `main`, tag that commit `vX.Y.Z`, and push the tag. `release.yml` re-runs the tests, the smoke and the
@@ -83,7 +85,20 @@ the package to require two-factor authentication and disallow tokens, and delete
 publisher configuration that has not published within two days expires, so the next release should follow soon
 or the configuration be made again.
 
-Repository settings the workflows and docs rely on:
+
+**Where a release shows up.** The [pi package gallery](https://pi.dev/packages) lists the package from npm within
+minutes of a publish: its card shows the `package.json` `description` and the `pi.image` card
+(`.github/assets/infographic.png`, pinned to the release tag), and its page renders the README inside the published
+tarball. Editing either on GitHub changes nothing there until the next release, and a README link to a file the
+package does not ship must be an absolute GitHub URL. After `publish`, `release.yml` creates the GitHub Release
+for the tag from its `CHANGELOG.md` section; for the manual first publish, run
+`gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file <that section>` instead. The repository's
+social preview (Settings > General) is `.github/assets/social-preview.png`, uploaded by hand.
+
+## Repository settings (maintainers)
+
+The workflows and docs rely on:
+
 
 - an `npm` environment with required reviewers and a deployment rule limited to `v*` tags, and a ruleset that
   protects `v*` tags and `main` (required checks, no force push);
@@ -93,7 +108,9 @@ Repository settings the workflows and docs rely on:
 - Dependabot alerts and security updates, plus the weekly version updates in `.github/dependabot.yml`; CodeQL
   default setup, whose high and critical alerts block a merge; secret scanning with push protection;
 - "Allow GitHub Actions to create and approve pull requests", so the nightly can open its pull request;
-- Discussions (the issue template links to them) and private vulnerability reporting (SECURITY.md does).
+- Discussions (the issue template links to them) and private vulnerability reporting (SECURITY.md does);
+- GitHub pauses scheduled workflows in a repository with no activity for 60 days; re-enable `nightly-pi` from
+  the Actions tab when that happens.
 
 ## Licence
 
