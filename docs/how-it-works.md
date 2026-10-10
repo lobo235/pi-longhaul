@@ -59,8 +59,7 @@ or another extension's), its summary goes into the prompt, head and tail, and th
 forward what it still holds. Because a summary paraphrases, the pass also lists the user's earlier messages that
 read as standing rules verbatim and records each as a correction itself, unless the model marks it a one-off (a
 request, an answer or a question). A message reads as one when a sentence of it, not a question (a closing "ok?"
-asks nothing), says "from now on" (or "from here on", "going forward", or "in this repo" or "in this project" beside "every" or
-"instead of") and withdraws nothing, or has a clause with a rule word (never, always, don't, do not, must, stop, only) that is not in
+asks nothing), says "from now on" (or "from here on", "going forward") and withdraws nothing, or has a clause with a rule word (never, always, don't, do not, must, stop, only) that is not in
 a request for now ("yet", "for now", "this time"), not withdrawing something ("forget it"; "don't forget it" does
 not withdraw), not "never mind" and not describing a thing ("an option that keeps only lines"). It is judged clause
 by clause, so "never deploy on a Friday, not even this time" keeps its rule. A message it leaves out is still

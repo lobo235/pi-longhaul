@@ -222,14 +222,18 @@ test("readsAsStandingRule: a sentence that says what always holds, not a questio
     ["not even this time", "Never deploy on a Friday, not even this time.", true],
     ["yet in another clause", "Never push to main until CI is green, even if I have not reviewed yet.", true],
     ["a tag question", "Never force-push to main, ok?", true],
-    ["a scope phrase", "Use pnpm instead of npm in this repo.", true],
-    ["a project-wide rule without a rule word", "Use tabs for indentation in every TypeScript file in this project.", true],
+    ["a scope phrase is left to the model", "Use pnpm instead of npm in this repo.", false],
+    ["a project-wide rule without a rule word is left to the model", "Use tabs for indentation in every TypeScript file in this project.", false],
     ["a request in the project", "Fix the failing test in the project.", false],
     ["a search in the codebase", "Find where the parser is used in the codebase.", false],
     ["a one-off push in this repo", "Force-push the rebased branch in this repo.", false],
     ["a one-off delete in the repo", "Delete the generated files in the repo.", false],
     ["a relayed status line", "I fixed the bug in the repo and pushed it.", false],
     ["a question with a closing tag", "Do we always deploy on Friday, right?", false],
+    ["a bulk one-off in this repo", "Delete every generated file in this repo.", false],
+    ["another bulk one-off", "Force-push every branch in this repo.", false],
+    ["a tagged do-not rule", "Do not force-push to main, ok?", true],
+    ["another tagged do-not rule", "Do not commit secrets, right?", true],
   ];
   for (const [name, text, expected] of cases) assert.equal(readsAsStandingRule(text), expected, name);
 });
