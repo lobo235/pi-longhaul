@@ -81,23 +81,25 @@ function warnUnusableRoots(rt: Runtime, ctx: Notify, config: StateConfig): void 
   warnOnce(rt, ctx, `local-only-roots:${notice}`, notice);
 }
 
-export default function compactionStateExtension(pi: ExtensionAPI) {
+/** `piVersion` is for tests: pi passes only `pi`, and the running pi is the one Longhaul is checked against. */
+export default function compactionStateExtension(pi: ExtensionAPI, options: { piVersion?: string } = {}) {
+  const piVersion = options.piVersion ?? PI_VERSION;
   // The marker a compactor that defers to Longhaul reads (select.ts): set at LOAD, which is earlier
   // than session_start and strictly safer -- no compaction can precede the load, and a
   // factory re-invoked per session sets it again harmlessly. The value is this process's pid, so a
   // child pi that inherits the variable without loading this extension does not count it.
   process.env[STATE_LOADED_ENV] = stateLoadedMarker();
   const piCompat = readPiCompat();
-  const piStatus = piVersionStatus(PI_VERSION, piCompat);
+  const piStatus = piVersionStatus(piVersion, piCompat);
   const loadDefaultLog = defaultLogPath();
   const loadLogPath = resolveLogPath(process.env.PI_COMPACT_STATE_DEBUG, loadDefaultLog);
   // The default directory is the extension's own, so it is tightened; a path the user chose keeps its mode.
   if (loadLogPath === loadDefaultLog) privateLogDir(path.dirname(loadDefaultLog));
-  if (loadLogPath) appendJsonl(loadLogPath, { event: "extension-loaded", piVersion: PI_VERSION, piVersionVerified: piStatus === "exact" ? true : piStatus === "line" ? "line" : false });
+  if (loadLogPath) appendJsonl(loadLogPath, { event: "extension-loaded", piVersion, piVersionVerified: piStatus === "exact" ? true : piStatus === "line" ? "line" : false });
   registerReportCommand(pi, piStatus);
   pi.registerEntryRenderer(LINE_ENTRY_TYPE, renderCompactionLine);
 
-  const rt: Runtime = { pi, warned: new Set(), routeHealth: createRouteHealth(), piVersionNotice: unverifiedPiVersionNotice(PI_VERSION, piCompat) ?? undefined };
+  const rt: Runtime = { pi, warned: new Set(), routeHealth: createRouteHealth(), piVersionNotice: unverifiedPiVersionNotice(piVersion, piCompat) ?? undefined };
   pi.on("session_start", async (_event, ctx) => onSessionStart(rt, ctx));
   pi.on("context", async (event, ctx) => keptWindowContext(rt, event, ctx));
   pi.on("model_select", async (event, ctx) => {
@@ -118,8 +120,9 @@ function onSessionStart(rt: Runtime, ctx: ExtensionContext): void {
   rt.warned.clear();
   rt.announcedCutoff = undefined;
   process.env[STATE_LOADED_ENV] = stateLoadedMarker();
-  if (rt.piVersionNotice) ctx.ui.notify?.(rt.piVersionNotice, "warning");
+  // The notice is about compactions Longhaul makes, so a session that opted out of them is not told.
   if (standsDown()) return;
+  if (rt.piVersionNotice) ctx.ui.notify?.(rt.piVersionNotice, "warning");
   const config = resolveStateConfig(readConfigFile);
   rt.keptWindowThinking = config.keptWindowThinking;
   const warmNotice = warmModeNotice(config);
