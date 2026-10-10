@@ -13,7 +13,7 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { MIN_QUOTE_CHARS, type Quote, type Rejection } from "./store/events.ts";
 import type { QuoteChecker } from "./store/log.ts";
 import type { QuoteResolution, QuoteResolver } from "./store/verify.ts";
-import { WITHDRAWAL_CUE } from "./store/lift-vocabulary.ts";
+import { NEGATED, WITHDRAWAL_CUE } from "./store/lift-vocabulary.ts";
 
 export interface IndexedUserMessage {
   ordinal: string;
@@ -125,32 +125,42 @@ export function quotableText(text: string): string {
 /** Words that make a user message read as a standing rule. A pointer for the model, never a verdict: quotes are still verified. */
 export const RULE_SHAPE_RE = /\b(never|always|don'?t|do not|must|stop|only)\b/i;
 const RULE_WORDS = new RegExp(RULE_SHAPE_RE.source, "gi");
-/** Words that say a rule holds from here on, with or without a rule word ("from now on every option gets a row"). */
-const STANDING_RE = /\b(?:from (?:now|here|this point) on|going forward)\b/i;
+/** Words that say a rule holds from here on or across the work: "from now on every option gets a row", "in this repo". */
+const STANDING_RE = /\b(?:from (?:now|here|this point) on|going forward|in (?:this|the|our) (?:project|repo(?:sitory)?|codebase))\b/i;
 /** Words that say a request is for now only: "don't commit yet", "stop the watcher for the moment". */
 const FOR_NOW_RE = /\b(?:yet|for now|right now|for the moment|at the moment|this time|just this once)\b/i;
 /** A rule word that only describes a thing: "an option that keeps only lines", "never mind". */
 const DESCRIBES_RE = /\b(?:that|which)\s+\w+s\s+$/i;
 const IDIOM_RE = /^never\s+mind\b/i;
+/** A tag that asks for no answer: "never force-push to main, ok?" is a statement. */
+const TAG_RE = /,\s*(?:ok(?:ay)?|right|alright|all right|got it|understood|clear|agreed|yes)\W*$/i;
+
+/** A withdrawal word no negation takes back: "forget it" withdraws, "don't forget it" and "never ignore" do not. */
+function withdraws(clause: string): boolean {
+  return [...clause.matchAll(WITHDRAWAL_CUE)].some((match) => !NEGATED.test(clause.slice(Math.max(0, match.index - 80), match.index)));
+}
 
 /**
- * Whether a user message says what holds from now on, sentence by sentence: a sentence with a standing marker, or with a
- * rule word that is not in a question, a request for now or a withdrawal (a lift, which the model labels), not "never
- * mind" and not describing a thing. "Instead" is no rule word: "skip bad lines instead of throwing" asks for one change. The floor
- * records every message this accepts unless the model calls it a one-off, so it errs towards leaving a message to the
- * model's own label (earlierOtherMessages) rather than recording a request as a rule.
+ * Whether a user message says what holds from now on. A sentence that is not a question (a closing "ok?" asks
+ * nothing) holds a standing rule when a clause of it has a rule word outside a request for now, a withdrawal, "never
+ * mind" and a description of a thing ("an option that keeps only lines"); or when the sentence says "from now on" or
+ * "in this repo" and withdraws nothing ("the rule is lifted; anything is fine from now on" is a lift, which the model
+ * labels). Clause by clause, so "never deploy on a Friday, not even this time" keeps its rule. "Instead" is no rule
+ * word: "skip bad lines instead of throwing" asks for one change. A message this rejects is still shown to the model,
+ * which can label it a rule (earlierOtherMessages); one it accepts is recorded unless the model calls it a one-off.
+ * Bounded: longer text is a paste, never a rule (EARLIER_RULE_MAX_CHARS).
  */
 export function readsAsStandingRule(text: string): boolean {
-  return sentencesOf(text).some(({ body, question }) => {
-    if (question || FOR_NOW_RE.test(body) || body.search(WITHDRAWAL_CUE) !== -1) return false;
-    if (STANDING_RE.test(body)) return true;
-    return [...body.matchAll(RULE_WORDS)].some((match) => !IDIOM_RE.test(body.slice(match.index)) && !DESCRIBES_RE.test(body.slice(0, match.index)));
+  if (text.length > EARLIER_RULE_MAX_CHARS) return false;
+  return text.split(/(?<=[.!?])\s+/).some((sentence) => {
+    const body = sentence.trim();
+    if (body.endsWith("?") && !TAG_RE.test(body)) return false;
+    const clauses = body.split(/[,;:]/);
+    if (clauses.some((clause) => STANDING_RE.test(clause) && !FOR_NOW_RE.test(clause)) && !withdraws(body)) return true;
+    return clauses.some((clause) => !FOR_NOW_RE.test(clause) && !withdraws(clause) && [...clause.matchAll(RULE_WORDS)].some((match) => !IDIOM_RE.test(clause.slice(match.index)) && !DESCRIBES_RE.test(clause.slice(0, match.index))));
   });
 }
 
-function sentencesOf(text: string): Array<{ body: string; question: boolean }> {
-  return [...text.matchAll(/(?:[^.!?]|[.!?](?![.!?]*(?:\s|$)))+[.!?]*/g)].map((match) => ({ body: match[0], question: match[0].trimEnd().endsWith("?") })).filter(({ body }) => body.trim() !== "");
-}
 export const EARLIER_RULE_MAX_CHARS = 600;
 export const EARLIER_RULES_TOTAL_CHARS = 6000;
 

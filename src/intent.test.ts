@@ -216,6 +216,14 @@ test("readsAsStandingRule: a sentence that says what always holds, not a questio
     ["a change asked for once", "Make the parser skip malformed lines instead of throwing, and report how many it skipped.", false],
     ["a lift with a standing marker", "The DRY: prefix rule is lifted; plain dry-run output is fine from now on.", false],
     ["a retraction with a standing marker", "Forget what I said about commit message style; any message is fine from here on.", false],
+    ["a negated withdrawal word keeps the rule", "Never ignore a failing test; always fix it before moving on.", true],
+    ["don't forget it", "Never force-push to main, and don't forget it.", true],
+    ["a withdrawal in another clause", "Always run make check before a commit, no need to ask me first.", true],
+    ["not even this time", "Never deploy on a Friday, not even this time.", true],
+    ["yet in another clause", "Never push to main until CI is green, even if I have not reviewed yet.", true],
+    ["a tag question", "Never force-push to main, ok?", true],
+    ["a scope phrase", "Use pnpm instead of npm in this repo.", true],
+    ["a project-wide rule without a rule word", "Use tabs for indentation in every TypeScript file in this project.", true],
   ];
   for (const [name, text, expected] of cases) assert.equal(readsAsStandingRule(text), expected, name);
 });

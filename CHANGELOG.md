@@ -51,8 +51,12 @@ entries and log event types. Rendered state text, prompt wording and section lay
   back in and a rule worded without a rule word ("tests go under tests/") is carried; one longer than the
   excerpt shown is recorded only from the exact words given for it. After a fallback (a failed pass, then pi's
   own compaction), only the messages since Longhaul's last whole span are offered, so a rule the state had
-  lifted or named a one-off is not recorded again. An earlier rule-shaped message may carry a label too, so one that
-  replaced an earlier rule ("two-space indentation instead of tabs") withdraws it; left unlabeled it is recorded
+  lifted or named a one-off is not recorded again. Only an earlier message that reads as a standing rule is recorded
+  without a label: a sentence, not a question, that says "from now on" or "in this repo" and withdraws nothing, or
+  has a clause with a rule word outside a request for now ("don't commit yet"), a withdrawal, "never mind" and a
+  described feature ("an option that keeps only lines").
+  Such a message may carry a label too, so one that replaced an earlier rule ("two-space indentation instead of
+  tabs from now on") withdraws it; left unlabeled it is recorded
   in message order and a replacement it makes is asked about. A value the earlier summary records is kept when an
   earlier turn shows it verbatim, checked as a span's value is; the summary itself is never a source.
 - The summarizer moves the objective only forward: quoting the objective's own message again changes nothing
