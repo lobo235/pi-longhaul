@@ -43,6 +43,7 @@ a whole count. Anything still in the kept window is not judged, since the messag
 
 | labeled field | measures | higher is |
 |---|---|---|
+| `goal` | the message that says what the session builds, once summarized: kept when any line of the state or summary still names it, by the label's marker | better |
 | `rules` | labeled rules in force at the cut (given before it, not yet lifted) that a rules-section line matches by the rule's marker | better |
 | `span`, `earlier` | the same, split into rules given in the span this compaction closes and rules given before it | better |
 | `lifts` | rules the user withdrew before the cut that no rules-section line still shows in force (a line shows a rule lifted only by words outside its quotes: a rule's own "doesn't apply to JSON" does not count) | better |
@@ -160,6 +161,7 @@ history out of 5) move by one on noise, and nothing here says how a hosted model
 
 | labeled | `state` | `state-unlearned` | `pi-default` |
 |---|---|---|---|
+| `goal` | 26/76 | 26/76 | **76**/76 |
 | `rules` | **226**/227 | 226/227 | 211/227 |
 | `span` | **21**/22 | 21/22 | 17/22 |
 | `earlier` | **205**/205 | 205/205 | 194/205 |
@@ -199,7 +201,10 @@ What it says:
   is not.
 - **Cost.** One diff call per compaction: about half the prompt tokens, a fifth of the output tokens and a
   fifth of the median time of pi's own compaction on the same spans, with a smaller result.
-- **Weak spots.** 15 rule lines were stray, mostly one-off requests kept as rules. The recorded objective
+- **Weak spots.** The session's goal was gone from 50 of the 76 states (`goal`, counted afterwards from this
+  run's saved states): the Objective showed the current request and the two before it, and once the work moved
+  past three requests the opening one, which says what is being built, fell out. pi's summary kept it every time.
+  15 rule lines were stray, mostly one-off requests kept as rules. The recorded objective
   changed at 42 of 76 compactions, and 47 of the 76 bring a new user message; the objective is the request the
   work answers now, so this mostly follows the work (a later run counting by message: 45, none backward).
 
@@ -208,6 +213,7 @@ summary of everything before the span, as when it is enabled in a session pi has
 
 | labeled | `state` | `pi-default` |
 |---|---|---|
+| `goal` | 76/76 | 76/76 |
 | `rules` | **210**/227 | 208/227 |
 | `span` | **22**/22 | 17/22 |
 | `earlier` | 188/205 | **191**/205 |

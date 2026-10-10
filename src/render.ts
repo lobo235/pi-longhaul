@@ -9,7 +9,7 @@ import { renderFilesSection } from "./files-render.ts";
 import { oneLine } from "./one-line.ts";
 import { renderLearnedSection, type LearnedValue } from "./learned.ts";
 import type { Caps, Quote } from "./store/events.ts";
-import { activeCorrections, activeDeadEnds, activeDecisions, activeWorkLog, type SessionState, type TextItem } from "./store/project.ts";
+import { activeCorrections, activeDeadEnds, activeDecisions, activeWorkLog, GOAL_SOURCE_LABEL, goalLine, type SessionState, type TextItem } from "./store/project.ts";
 import { renderTaskLine, type RunningTask } from "./tasks.ts";
 import { evaluateDoneGate, renderDoneGate, renderWorldLines } from "./world-render.ts";
 
@@ -66,9 +66,9 @@ function tokensLabel(tokens: number): string {
 export const EARLIER_REQUESTS_SHOWN = 2;
 export const EARLIER_REQUESTS_LABEL = "Earlier requests (may already be done; check the work log and newer messages):";
 
-/** The newest Requests the summarizer moved away from, distinct, never the current one or the Goal. */
-function earlierRequests(state: SessionState): Quote[] {
-  const shown = new Set([state.objective?.quote.text, state.goal?.quote.text].filter((text): text is string => text !== undefined).map(oneLine));
+/** The newest Requests the summarizer moved away from, distinct, never the current one or the Goal line. */
+function earlierRequests(state: SessionState, goal: Quote | undefined): Quote[] {
+  const shown = new Set([state.objective?.quote.text, goal?.text].filter((text): text is string => text !== undefined).map(oneLine));
   const earlier: Quote[] = [];
   for (const moved of [...(state.objective?.movedFrom ?? [])].reverse()) {
     if (earlier.length >= EARLIER_REQUESTS_SHOWN) break;
@@ -81,8 +81,9 @@ function earlierRequests(state: SessionState): Quote[] {
 }
 
 function objectiveSection({ state, ledger, snapshot, caps }: RenderInput): string[] {
-  const { objective, goal } = state;
-  const goalLines = goal ? [`Goal (${goal.quote.ordinal}, the active /goal): ${renderQuote(goal.quote, caps.objectiveQuoteChars)}`] : [];
+  const { objective } = state;
+  const goal = goalLine(state);
+  const goalLines = goal ? [`Goal (${goal.quote.ordinal}, ${GOAL_SOURCE_LABEL[goal.source]}): ${renderQuote(goal.quote, caps.objectiveQuoteChars)}`] : [];
   if (!objective && !goal) return ["## Objective (not set)", "> —", "Done when: not stated", renderDoneGate({ kind: "not-mechanical" })];
   const moved = objective?.movedFrom.at(-1);
   const heading = !objective ? `goal ${goal!.quote.ordinal}` : moved ? `${objective.quote.ordinal}, moved from ${moved.quote.ordinal} at span ${objective.setSpan}` : `${objective.quote.ordinal}, unchanged since span ${objective.setSpan}`;
@@ -90,7 +91,7 @@ function objectiveSection({ state, ledger, snapshot, caps }: RenderInput): strin
   const request = !objective ? (goal ? ["Request: the goal itself"] : []) : !goal ? [`> ${renderQuote(objective.quote, caps.objectiveQuoteChars)}`] : sameAsGoal ? ["Request: the goal itself"] : [`Request (${objective.quote.ordinal}): ${renderQuote(objective.quote, caps.objectiveQuoteChars)}`];
   const doneWhen = objective?.doneWhen ? `Done when: ${renderQuote(objective.doneWhen, caps.objectiveQuoteChars)} (${objective.doneWhen.ordinal})` : "Done when: not stated";
   const gate = renderDoneGate(evaluateDoneGate(objective?.doneWhen?.text, ledger.commands, state.world?.claims ?? [], snapshot));
-  const earlier = earlierRequests(state);
+  const earlier = earlierRequests(state, goal?.quote);
   const earlierLines = earlier.length ? [EARLIER_REQUESTS_LABEL, ...earlier.map((quote) => `- ${quote.ordinal} ${renderQuote(quote, caps.itemChars)}`)] : [];
   return [`## Objective (${heading})`, ...goalLines, ...request, doneWhen, gate, ...earlierLines];
 }

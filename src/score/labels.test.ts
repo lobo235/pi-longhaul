@@ -28,6 +28,7 @@ const labels: SessionLabels = {
     { at: "u3", quote: "Don't use regular expressions", marker: "regular expression|regex" },
   ],
   values: [{ name: "first time", value: ["166 ms", "166ms"], learnedAt: "u2", usedAt: "u6", history: true }],
+  goal: { at: "u2", marker: "time it|timing" },
 };
 
 const candidate = (pathEntries = branch, rest = after): Candidate => ({ file: "/s/x.jsonl", session: "x", at: "t", index: pathEntries.length, entryId: "c9", pathEntries, after: rest, spanUserTexts: [], pathUserTexts: [] });
@@ -87,10 +88,21 @@ test("labeledMeasures: stray rules are the state's rule lines bound to a message
   assert.equal(labeledMeasures(labels, candidate(), "m5", "## Constraints & Preferences\n- keep it small\n").strayRules, undefined, "only a state's bound rule lines can be judged");
 });
 
+test("labeledMeasures: the goal is due once its message is summarized, and kept when any line of the state names it", () => {
+  assert.deepEqual(labeledMeasures(labels, candidate(), "m5", "## Objective (u5)\nGoal (u2, the session's opening request): \"Time it.\"\n").goal, { kept: 1, total: 1 });
+  assert.deepEqual(labeledMeasures(labels, candidate(), "m5", "## Work log\n1. [u1–u4] timing done\n").goal, { kept: 1, total: 1 }, "anywhere in the state");
+  assert.deepEqual(labeledMeasures(labels, candidate(), "m5", "## Objective (u5)\n> \"Add a README.\"\n").goal, { kept: 0, total: 1 });
+  assert.deepEqual(labeledMeasures(labels, candidate(), "m2", "").goal, { kept: 0, total: 0 }, "its message is still in the kept window");
+  const { goal: _none, ...unlabeled } = labels;
+  assert.deepEqual(labeledMeasures(unlabeled, candidate(), "m5", "").goal, { kept: 0, total: 0 }, "a session with no goal label");
+});
+
 test("parseLabels: a malformed label file is refused, naming what is wrong", () => {
   assert.throws(() => parseLabels("{"), /labels/);
   assert.throws(() => parseLabels(JSON.stringify({ sessions: { x: { rules: [{ at: "2", quote: "q", marker: "m" }], values: [] } } })), /x.*at/);
   assert.throws(() => parseLabels(JSON.stringify({ sessions: { x: { rules: [{ at: "u2", quote: "q", marker: "(" }], values: [] } } })), /x.*marker/);
+  assert.throws(() => parseLabels(JSON.stringify({ sessions: { x: { rules: [], values: [], goal: { at: "1", marker: "m" } } } })), /x.*goal/);
+  assert.throws(() => parseLabels(JSON.stringify({ sessions: { x: { rules: [], values: [], goal: { at: "u1", marker: "(" } } } })), /x.*goal/);
   assert.equal(Object.keys(parseLabels(JSON.stringify({ sessions: { x: { rules: [], values: [] } } }))).length, 1);
 });
 
@@ -98,7 +110,7 @@ test("summarizeLabeled: counts summed over an arm's rows, so every number in the
   const one = labeledMeasures(labels, candidate(), "m5", "## Constraints & corrections\n- R1 [u3] \"Don't use regular expressions\"\n- R2 [u5] \"Add a README.\"\n## Now\n166 ms\n");
   const two = labeledMeasures(labels, candidate(), "m5", "## Constraints\n- no npm dependencies\n");
   const summary = summarizeLabeled([{ labeled: one }, { labeled: two }, {}]);
-  assert.deepEqual(summary, { rows: 2, rules: { kept: 1, total: 2 }, spanRules: { kept: 1, total: 2 }, earlierRules: { kept: 0, total: 0 }, lifts: { honoured: 1, total: 2 }, values: { kept: 1, total: 2 }, historyValues: { kept: 1, total: 2 }, strayRules: 1 });
+  assert.deepEqual(summary, { rows: 2, goal: { kept: 0, total: 2 }, rules: { kept: 1, total: 2 }, spanRules: { kept: 1, total: 2 }, earlierRules: { kept: 0, total: 0 }, lifts: { honoured: 1, total: 2 }, values: { kept: 1, total: 2 }, historyValues: { kept: 1, total: 2 }, strayRules: 1 });
   assert.equal(summarizeLabeled([{}]), null, "no labeled rows, no summary");
-  assert.equal(formatLabeledLine("state", summary!), "state           labeled n=2 rules=1/2 span=1/2 earlier=0/0 lifts=1/2 values=1/2 history=1/2 stray=1");
+  assert.equal(formatLabeledLine("state", summary!), "state           labeled n=2 goal=0/2 rules=1/2 span=1/2 earlier=0/0 lifts=1/2 values=1/2 history=1/2 stray=1");
 });

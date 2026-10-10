@@ -74,6 +74,10 @@ longhaul_recall: span N | commands <pattern> | errors | files <pattern> | decisi
 `u3` is your third message, `C1` a command the session ran, `E1` an error it hit. pi sends the state, then the
 messages it kept after the cut, so the model reads the state first and the newest messages last.
 
+When you move on to another request, the Objective keeps your opening request as a `Goal` line above the new
+`Request`, so what the session is for survives every compaction; an active pi-goal `/goal` takes that line
+instead.
+
 ## Install
 
 ```bash

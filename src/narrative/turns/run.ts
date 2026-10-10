@@ -88,7 +88,7 @@ function factsOf(input: TurnsInput): Facts {
     contextOrdinals: input.promptState.seed ? (input.promptState.seedContext ?? []).map((message) => message.ordinal) : [],
     textOf: input.context.textOf,
     objective,
-    ...(input.state.goal ? { goal: { ordinal: input.state.goal.quote.ordinal, text: input.state.goal.quote.text } } : {}),
+    ...(input.promptState.goal ? { goal: input.promptState.goal } : {}),
     activeCorrections: activeCorrections(input.state).map((item) => ({ id: item.id, ordinal: item.quote.ordinal, text: item.quote.text })),
     openErrorIds: input.context.openErrorIds,
     unresolvedSpanErrorIds: input.context.unresolvedSpanErrorIds,

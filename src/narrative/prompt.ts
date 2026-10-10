@@ -8,7 +8,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
 import { normalizeWs } from "../intent.ts";
 import type { Now, StateEvent } from "../store/events.ts";
-import { activeCorrections, activeDeadEnds, activeDecisions, type SessionState } from "../store/project.ts";
+import { activeCorrections, activeDeadEnds, activeDecisions, GOAL_SOURCE_LABEL, goalLine, type GoalSource, type SessionState } from "../store/project.ts";
 import { fitFirstChunk } from "./fit.ts";
 import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from "./message-labels.ts";
 
@@ -31,8 +31,10 @@ import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from ".
  *   carry out a withdrawal is not a new rule.
  * state-15: an earlier message recorded as a rule still takes a label when it replaces or withdraws an earlier rule
  *   (the seed floor now records "from now on" replacements, which "they need no label" left lifting nothing).
+ * state-16: outside a /goal, the session's opening request is the goal line once the Request has moved from it
+ *   (store/project.ts goalLine), so the project's purpose survives every compaction; never quoted as the objective.
  */
-export const NARRATIVE_PROMPT_REVISION = "state-15";
+export const NARRATIVE_PROMPT_REVISION = "state-16";
 
 export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a coding session that is being compacted. You are given the state so far, the user's messages with their ordinals (u1, u2, ...), and the conversation being compacted. Answer with ONE fenced json block and nothing else:
 
@@ -49,11 +51,11 @@ export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a codi
 }
 \`\`\`
 
-Rules. "objective" is the request the work is answering now. It is optional: include it only when none is set or the user moved to a different request in this span, and quote the user's own message verbatim. The goal line, when present, is the active /goal: code keeps it, so never quote it as the objective; inside a goal the objective is the specific ask. "labels": Label EVERY message in <user-messages> with one of ${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} The target is R<n> from the state, or u<n> for a rule given earlier in this span. "not a rule" is a request, question, answer, approval or one-off. Code copies the user's words into the state, so a short message labeled a rule needs no quote; a message longer than ${RULE_WHOLE_CHARS} characters labeled a rule must come with the rule's exact words: {"u7": {"rule": "<exact words>"}}. "corrections" is only for a standing rule that an earlier summary records and no listed message gives; quote the user's exact words. "values": values a later turn may need again that no file will give back: a measurement, a total, a port or a count a turn reported, a hash it named, a file-name format the user chose ("<name>-YYYYMMDD.tar.gz"). Copy each exactly as it appears in the turn "ref" names (the user's message, your replies and the tool output up to the next user message); a value is a number with or without its unit ("166 ms"), a version, a short commit hash, a path or file name (with <placeholders> if the format has them), a host:port or a date; nothing else is kept. "name" is a short label (at most 40 characters, no colon) saying what it is. At most 12, never a password, key or token. "decisions" and "deadEnds" are your own one-sentence records with evidence: a command id C<n>, an error id E<n>, a message u<n>, or the words "last command" / "last error". "now" replaces the previous Now entirely. Never write "done" unless the state's Done gate line says met. Empty arrays are fine. No prose outside the fence.`;
+Rules. "objective" is the request the work is answering now. It is optional: include it only when none is set or the user moved to a different request in this span, and quote the user's own message verbatim. The goal line, when present, is the active /goal or the session's opening request: code keeps it, so never quote it as the objective; under a goal the objective is the specific ask. "labels": Label EVERY message in <user-messages> with one of ${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} The target is R<n> from the state, or u<n> for a rule given earlier in this span. "not a rule" is a request, question, answer, approval or one-off. Code copies the user's words into the state, so a short message labeled a rule needs no quote; a message longer than ${RULE_WHOLE_CHARS} characters labeled a rule must come with the rule's exact words: {"u7": {"rule": "<exact words>"}}. "corrections" is only for a standing rule that an earlier summary records and no listed message gives; quote the user's exact words. "values": values a later turn may need again that no file will give back: a measurement, a total, a port or a count a turn reported, a hash it named, a file-name format the user chose ("<name>-YYYYMMDD.tar.gz"). Copy each exactly as it appears in the turn "ref" names (the user's message, your replies and the tool output up to the next user message); a value is a number with or without its unit ("166 ms"), a version, a short commit hash, a path or file name (with <placeholders> if the format has them), a host:port or a date; nothing else is kept. "name" is a short label (at most 40 characters, no colon) saying what it is. At most 12, never a password, key or token. "decisions" and "deadEnds" are your own one-sentence records with evidence: a command id C<n>, an error id E<n>, a message u<n>, or the words "last command" / "last error". "now" replaces the previous Now entirely. Never write "done" unless the state's Done gate line says met. Empty arrays are fine. No prose outside the fence.`;
 
 export interface PromptState {
-  /** The Goal (the active /goal), shown so the summarizer never re-picks it as the Request. */
-  goal?: { ordinal: string; text: string };
+  /** The Goal line (store/project.ts goalLine), shown so the summarizer never re-picks it as the Request. */
+  goal?: { ordinal: string; text: string; source: GoalSource };
   objective?: { ordinal: string; text: string; doneWhen?: { ordinal: string; text: string } };
   corrections: Array<{ id: string; ordinal: string; text: string; lifted?: string }>;
   decisions: Array<{ id: string; text: string }>;
@@ -115,9 +117,15 @@ const rememberedText = (event: StateEvent): { kind: string; text: string } | und
   }
 };
 
+/** The Goal line as the summarizer sees it; the turns runner shows the same one. */
+function goalOf(state: SessionState): { goal?: PromptState["goal"] } {
+  const goal = goalLine(state);
+  return goal ? { goal: { ordinal: goal.quote.ordinal, text: goal.quote.text, source: goal.source } } : {};
+}
+
 export function promptStateOf(state: SessionState, remembered: StateEvent[]): PromptState {
   return {
-    ...(state.goal ? { goal: { ordinal: state.goal.quote.ordinal, text: state.goal.quote.text } } : {}),
+    ...goalOf(state),
     objective: state.objective ? { ordinal: state.objective.quote.ordinal, text: state.objective.quote.text, doneWhen: state.objective.doneWhen ? { ordinal: state.objective.doneWhen.ordinal, text: state.objective.doneWhen.text } : undefined } : undefined,
     corrections: activeCorrections(state).map((item) => ({ id: item.id, ordinal: item.quote.ordinal, text: item.quote.text, lifted: item.liftedBy?.ordinal })),
     decisions: activeDecisions(state).map((item) => ({ id: item.id, text: item.text })),
@@ -149,7 +157,7 @@ export function planChunks(input: { messages: AgentMessage[]; fixedChars: number
 
 export function stateBlock(state: PromptState): string {
   const lines = [
-    ...(state.goal ? [`goal: [${state.goal.ordinal}] ${state.goal.text} (the active /goal; kept by code)`] : []),
+    ...(state.goal ? [`goal: [${state.goal.ordinal}] ${state.goal.text} (${GOAL_SOURCE_LABEL[state.goal.source]}; kept by code)`] : []),
     `objective: ${state.objective ? `[${state.objective.ordinal}] ${state.objective.text}` : "(not set: set it from the first user message that states the goal)"}`,
     ...(state.objective?.doneWhen ? [`doneWhen: [${state.objective.doneWhen.ordinal}] ${state.objective.doneWhen.text}`] : []),
     "corrections:",

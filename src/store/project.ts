@@ -6,6 +6,7 @@
  * Retirement is a projection rule: the log never deletes, and recall reads the log.
  */
 import type { Caps, ForeignCompactor, Now, Quote, Source, StateEvent, StateLog, World } from "./events.ts";
+import { oneLine } from "../one-line.ts";
 
 export interface CorrectionItem {
   id: string;
@@ -181,4 +182,23 @@ export const activeWorkLog = (state: SessionState): WorkLogLine[] => state.workL
 /** The remember events accepted in `span` (the diff prompt lists them; the cap counts them). */
 export function acceptedRemembers(log: StateLog, span: number): StateEvent[] {
   return log.events.filter((event) => event.source === "remember" && event.span === span);
+}
+
+export type GoalSource = "goal" | "opening";
+
+/** How the Goal line names where it came from, in the rendered state and in the summarizer's prompts. */
+export const GOAL_SOURCE_LABEL: Record<GoalSource, string> = { goal: "the active /goal", opening: "the session's opening request" };
+
+/**
+ * The Goal line: the active /goal, else the session's Opening request once the Request has moved away from it.
+ * Derived, never recorded: the opening request is the first quote `objective.movedFrom` already keeps, so every
+ * transcript gets the line without a new event, and the summarizer cannot move or drop it. (A `goal.set` written by
+ * the pass was the alternative; it would change the log format and leave existing transcripts without the line.)
+ * Undefined when the Request is still the opening request, or is back on it: the Request line already shows it.
+ */
+export function goalLine(state: SessionState): { quote: Quote; source: GoalSource } | undefined {
+  if (state.goal) return { quote: state.goal.quote, source: "goal" };
+  const opening = state.objective?.movedFrom[0]?.quote;
+  if (!opening || oneLine(opening.text) === oneLine(state.objective!.quote.text)) return undefined;
+  return { quote: opening, source: "opening" };
 }

@@ -29,6 +29,16 @@ test("promptStateOf: hot items with ids and ordinals; remembered events of this 
   assert.deepEqual(state.remembered, [{ kind: "dead-end", text: "X1 structured outputs" }]);
 });
 
+test("promptStateOf: outside a /goal the opening request is the goal line once the Request moved, and the prompt says code keeps it", () => {
+  const unmoved = logOf(ev({ kind: "objective.set", quote: quote("u1", "build logstat, an access-log summarizer") }), closeEvent(1));
+  assert.equal(promptStateOf(project(unmoved, DEFAULT_CAPS), []).goal, undefined);
+  const moved = logOf(...unmoved.events, ev({ kind: "objective.set", quote: quote("u6", "add a --top option"), span: 2 }), closeEvent(2));
+  const state = promptStateOf(project(moved, DEFAULT_CAPS), []);
+  assert.deepEqual(state.goal, { ordinal: "u1", text: "build logstat, an access-log summarizer", source: "opening" });
+  const text = renderNarrativePrompt({ state, ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
+  assert.match(text, /\ngoal: \[u1\] build logstat, an access-log summarizer \(the session's opening request; kept by code\)\nobjective: \[u6\] add a --top option\n/);
+});
+
 test("planChunks: one chunk when it fits, several capped chunks when it does not, truncated past maxChunks", () => {
   const messages = Array.from({ length: 20 }, (_, i) => (i % 2 ? assistant("y".repeat(3000), i) : user("x".repeat(3000), i)));
   const one = planChunks({ messages: messages.slice(0, 2), fixedChars: 1000, outputBudget: 1000, contextWindow: 131072, maxChunks: 4 });
@@ -56,7 +66,7 @@ test("renderNarrativePrompt: system prompt first (cacheable), then state, ordina
   assert.ok(text.trimEnd().endsWith("</retry-note>"));
   assert.match(NARRATIVE_SYSTEM_PROMPT, /```json/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /"messageRef"/);
-  assert.equal(NARRATIVE_PROMPT_REVISION, "state-15");
+  assert.equal(NARRATIVE_PROMPT_REVISION, "state-16");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: every user message of the span is labeled, in every form the parser reads, whatever words it uses", () => {

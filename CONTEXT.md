@@ -11,7 +11,7 @@ product name is always given with the tagline "a state compactor for pi".
 _Avoid_: summarizer (that is the model call inside it)
 
 **Session state**:
-What survives a compaction: the objective, the user's standing corrections in their own words, decisions and
+What survives a compaction: the **Objective**, the user's standing corrections in their own words, decisions and
 dead ends with evidence, the **World**, the files, **Learned values**, one work-log line per **Span**, and Now.
 It is kept as an append-only log on the transcript and rendered under fixed caps.
 _Avoid_: summary, memory
@@ -39,6 +39,27 @@ A pass whose diff failed entirely. The span still closes from what code recorded
 **Ledger**:
 Every command the session ran with its exit code, and every error, each with an id (`C12`, `E3`) that
 evidence can cite.
+
+**Objective**:
+The state's first section: the **Goal line**, the **Request**, when the work counts as done, and the
+**Earlier requests**.
+
+**Request**:
+The user's request the work is answering now, quoted verbatim. The summarizer moves it to a later message when
+the user moves to a different request, never back to an earlier one.
+_Avoid_: task, objective (the section, not the quote)
+
+**Goal line**:
+What the session is for, kept by code and never moved by the summarizer: the active pi-goal `/goal`, else the
+session's **Opening request** once the Request has moved away from it.
+_Avoid_: objective, project goal
+
+**Opening request**:
+The first Request the session had. Outside a `/goal` it becomes the Goal line, so the session's purpose survives
+however often the Request moves.
+
+**Earlier requests**:
+The newest Requests the summarizer moved away from, other than the Goal line; they may already be done.
 
 **World**:
 The workspace at the moment of compaction: branch, commit, whether the tree is clean, the last result of each

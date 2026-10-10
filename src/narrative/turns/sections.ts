@@ -8,6 +8,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 
 import { DEFAULT_CAPS, type Now } from "../../store/events.ts";
+import { GOAL_SOURCE_LABEL } from "../../store/project.ts";
 import type { Proposal } from "../../store/verify.ts";
 import { quotableText } from "../../intent.ts";
 import { normalizeDiffShape } from "../parse.ts";
@@ -69,7 +70,7 @@ export const objectiveSection: Section<ObjectiveAnswer> = {
   id: "objective",
   instruction: (facts) => [
     "Section 2 of 5: the objective, the request the work is answering now.",
-    ...(facts.goal ? [`The active /goal is: [${facts.goal.ordinal}] ${facts.goal.text} (code keeps it; never answer it as the objective; inside it the objective is the specific ask).`] : []),
+    ...(facts.goal ? [`The goal line is: [${facts.goal.ordinal}] ${facts.goal.text} (${GOAL_SOURCE_LABEL[facts.goal.source]}; code keeps it; never answer it as the objective; under it the objective is the specific ask).`] : []),
     `The objective is now: ${facts.objective ? `[${facts.objective.ordinal}] ${facts.objective.text}` : "(not set)"}`,
     'If a user message in this span set the request or moved to a different one, answer {"objective": {"messageRef": "u<n>"}} (add "text": "<the user\'s exact words>" when only part of the message is the request); otherwise answer {"objective": "keep"}.',
     'Add "doneWhen": {"messageRef": "u<n>", "text": "<the user\'s exact words>"} only when the user said when the work counts as done.',

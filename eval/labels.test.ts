@@ -29,7 +29,7 @@ function turnsOf(branch: SessionEntry[]): Map<string, string> {
 }
 
 for (const [name, session] of Object.entries(labels)) {
-  test(`labels bind to the recorded ${name}: each rule's quote is in its message, each value is in its turn`, () => {
+  test(`labels bind to the recorded ${name}: each rule's quote is in its message, each value is in its turn, the goal marker is in its message`, () => {
     const entries = readTranscript(path.join(SESSIONS, `${name}.jsonl`));
     assert.ok(entries.length > 0, `${name}.jsonl is in eval/sessions`);
     const branch = pathTo(entries, entries.at(-1)!.id);
@@ -43,5 +43,7 @@ for (const [name, session] of Object.entries(labels)) {
       assert.ok(value.value.some((spelling) => mentions(turns.get(value.learnedAt) ?? "", spelling)), `${name}: ${value.name} is in turn ${value.learnedAt}`);
       assert.ok(turns.has(value.usedAt), `${name}: turn ${value.usedAt} exists`);
     }
+    assert.ok(session.goal, `${name} has a goal label`);
+    assert.match(index.textOf(session.goal.at) ?? "", new RegExp(session.goal.marker, "i"), `${name}: the goal marker matches ${session.goal.at}`);
   });
 }
