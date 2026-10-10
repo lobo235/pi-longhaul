@@ -52,7 +52,7 @@ entries and log event types. Rendered state text, prompt wording and section lay
   excerpt shown is recorded only from the exact words given for it. After a fallback (a failed pass, then pi's
   own compaction), only the messages since Longhaul's last whole span are offered, so a rule the state had
   lifted or named a one-off is not recorded again. Only an earlier message that reads as a standing rule is recorded
-  without a label: a sentence, not a question, that says "from now on" or "in this repo" and withdraws nothing, or
+  without a label: a sentence, not a question, that says "from now on" (or "in this repo" beside "every" or "instead of") and withdraws nothing, or
   has a clause with a rule word outside a request for now ("don't commit yet"), a withdrawal, "never mind" and a
   described feature ("an option that keeps only lines").
   Such a message may carry a label too, so one that replaced an earlier rule ("two-space indentation instead of

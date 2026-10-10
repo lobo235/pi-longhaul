@@ -125,15 +125,23 @@ export function quotableText(text: string): string {
 /** Words that make a user message read as a standing rule. A pointer for the model, never a verdict: quotes are still verified. */
 export const RULE_SHAPE_RE = /\b(never|always|don'?t|do not|must|stop|only)\b/i;
 const RULE_WORDS = new RegExp(RULE_SHAPE_RE.source, "gi");
-/** Words that say a rule holds from here on or across the work: "from now on every option gets a row", "in this repo". */
-const STANDING_RE = /\b(?:from (?:now|here|this point) on|going forward|in (?:this|the|our) (?:project|repo(?:sitory)?|codebase))\b/i;
+/** Words that say a rule holds from here on: "from now on every option gets a row". */
+const STANDING_RE = /\b(?:from (?:now|here|this point) on|going forward)\b/i;
+/**
+ * A scope that makes a clause a standing rule only beside a word that generalizes it: "use pnpm instead of npm in
+ * this repo", "tabs in every file in this project". Alone it is where a request applies ("force-push the rebased
+ * branch in this repo").
+ */
+const SCOPE_RE = /\bin this (?:project|repo(?:sitory)?|codebase)\b/i;
+const GENERALIZES_RE = /\b(?:every|each|whenever|instead of)\b/i;
 /** Words that say a request is for now only: "don't commit yet", "stop the watcher for the moment". */
 const FOR_NOW_RE = /\b(?:yet|for now|right now|for the moment|at the moment|this time|just this once)\b/i;
 /** A rule word that only describes a thing: "an option that keeps only lines", "never mind". */
 const DESCRIBES_RE = /\b(?:that|which)\s+\w+s\s+$/i;
 const IDIOM_RE = /^never\s+mind\b/i;
-/** A tag that asks for no answer: "never force-push to main, ok?" is a statement. */
+/** A tag that asks for no answer: "never force-push to main, ok?" is a statement; "do we always ..., right?" is not. */
 const TAG_RE = /,\s*(?:ok(?:ay)?|right|alright|all right|got it|understood|clear|agreed|yes)\W*$/i;
+const ASKS_RE = /^(?:do|does|did|is|are|was|were|should|shall|can|could|will|would|may|might|must|have|has|had)\b/i;
 
 /** A withdrawal word no negation takes back: "forget it" withdraws, "don't forget it" and "never ignore" do not. */
 function withdraws(clause: string): boolean {
@@ -141,22 +149,24 @@ function withdraws(clause: string): boolean {
 }
 
 /**
- * Whether a user message says what holds from now on. A sentence that is not a question (a closing "ok?" asks
- * nothing) holds a standing rule when a clause of it has a rule word outside a request for now, a withdrawal, "never
- * mind" and a description of a thing ("an option that keeps only lines"); or when the sentence says "from now on" or
- * "in this repo" and withdraws nothing ("the rule is lifted; anything is fine from now on" is a lift, which the model
- * labels). Clause by clause, so "never deploy on a Friday, not even this time" keeps its rule. "Instead" is no rule
- * word: "skip bad lines instead of throwing" asks for one change. A message this rejects is still shown to the model,
- * which can label it a rule (earlierOtherMessages); one it accepts is recorded unless the model calls it a one-off.
- * Bounded: longer text is a paste, never a rule (EARLIER_RULE_MAX_CHARS).
+ * Whether a user message says what holds from now on. A sentence that is not a question holds a standing rule when a
+ * clause of it has a rule word outside a request for now, a withdrawal, "never mind" and a description of a thing
+ * ("an option that keeps only lines"); or when the sentence says "from now on" (or "in this repo" beside "every" or
+ * "instead of") and withdraws nothing ("the rule is lifted; anything is fine from now on" is a lift, which the model
+ * labels). A closing "ok?" asks nothing unless the sentence opens as a question ("do we always ..., right?"). Clause
+ * by clause, so "never deploy on a Friday, not even this time" keeps its rule. "Instead" is no rule word: "skip bad
+ * lines instead of throwing" asks for one change. A message this rejects is still shown to the model, which can
+ * label it a rule (earlierOtherMessages); one it accepts is recorded unless the model calls it a one-off. Bounded:
+ * longer text is a paste, never a rule (EARLIER_RULE_MAX_CHARS).
  */
 export function readsAsStandingRule(text: string): boolean {
   if (text.length > EARLIER_RULE_MAX_CHARS) return false;
   return text.split(/(?<=[.!?])\s+/).some((sentence) => {
     const body = sentence.trim();
-    if (body.endsWith("?") && !TAG_RE.test(body)) return false;
+    if (body.endsWith("?") && (!TAG_RE.test(body) || ASKS_RE.test(body))) return false;
     const clauses = body.split(/[,;:]/);
-    if (clauses.some((clause) => STANDING_RE.test(clause) && !FOR_NOW_RE.test(clause)) && !withdraws(body)) return true;
+    const standing = (clause: string) => STANDING_RE.test(clause) || (SCOPE_RE.test(clause) && GENERALIZES_RE.test(clause));
+    if (clauses.some((clause) => standing(clause) && !FOR_NOW_RE.test(clause)) && !withdraws(body)) return true;
     return clauses.some((clause) => !FOR_NOW_RE.test(clause) && !withdraws(clause) && [...clause.matchAll(RULE_WORDS)].some((match) => !IDIOM_RE.test(clause.slice(match.index)) && !DESCRIBES_RE.test(clause.slice(0, match.index))));
   });
 }

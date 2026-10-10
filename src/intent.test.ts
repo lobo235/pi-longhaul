@@ -224,6 +224,12 @@ test("readsAsStandingRule: a sentence that says what always holds, not a questio
     ["a tag question", "Never force-push to main, ok?", true],
     ["a scope phrase", "Use pnpm instead of npm in this repo.", true],
     ["a project-wide rule without a rule word", "Use tabs for indentation in every TypeScript file in this project.", true],
+    ["a request in the project", "Fix the failing test in the project.", false],
+    ["a search in the codebase", "Find where the parser is used in the codebase.", false],
+    ["a one-off push in this repo", "Force-push the rebased branch in this repo.", false],
+    ["a one-off delete in the repo", "Delete the generated files in the repo.", false],
+    ["a relayed status line", "I fixed the bug in the repo and pushed it.", false],
+    ["a question with a closing tag", "Do we always deploy on Friday, right?", false],
   ];
   for (const [name, text, expected] of cases) assert.equal(readsAsStandingRule(text), expected, name);
 });
