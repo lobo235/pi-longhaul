@@ -81,14 +81,14 @@ function digestOf(input: TurnsInput): Digest {
 }
 
 function factsOf(input: TurnsInput): Facts {
-  const objective = input.state.objective ? { ordinal: input.state.objective.quote.ordinal, text: input.state.objective.quote.text } : undefined;
+  const objective = input.promptState.objective ? { ordinal: input.promptState.objective.ordinal, text: input.promptState.objective.text } : undefined;
   return {
     spanOrdinals: input.span.ordinals.map((entry) => entry.ordinal),
     seedOrdinals: input.promptState.seed ? (input.promptState.seedRules ?? []).map((rule) => rule.ordinal) : [],
     contextOrdinals: input.promptState.seed ? (input.promptState.seedContext ?? []).map((message) => message.ordinal) : [],
     textOf: input.context.textOf,
     objective,
-    ...(input.state.goal ? { goal: { ordinal: input.state.goal.quote.ordinal, text: input.state.goal.quote.text } } : {}),
+    ...(input.promptState.goal ? { goal: input.promptState.goal } : {}),
     activeCorrections: activeCorrections(input.state).map((item) => ({ id: item.id, ordinal: item.quote.ordinal, text: item.quote.text })),
     openErrorIds: input.context.openErrorIds,
     unresolvedSpanErrorIds: input.context.unresolvedSpanErrorIds,

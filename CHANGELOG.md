@@ -10,6 +10,10 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ### Added
 
+- The Objective keeps the session's opening request as its Goal line once the Request moves to a later one (an
+  active `/goal` takes the line instead), and the summarizer is told code keeps it. Before, the opening request
+  was shown only while it was one of the two newest earlier requests, and over the six eval sessions compacted in
+  a chain it was gone from 50 of 76 states. The scorer measures it as the labeled `goal`.
 - `pi-compat.json`, the pi release lines Longhaul is verified against; on any other pi it runs and warns once
   per session, except in a session that opted out of it (`PI_COMPACTOR=pi`).
 - The State compactor as a standalone pi package: a verified Session state carried across

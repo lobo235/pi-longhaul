@@ -1,7 +1,8 @@
 {
-  "about": "Ground truth for the scorer's labeled measures, written by hand from each scenario and its recording; never derived from either compactor's detector. rules: the standing rules the user gave (at = the user message, quote = a verbatim part of it, marker = a case-insensitive regular expression that a rule line holding this rule matches, liftedAt = the user message that withdrew or replaced it). values: values a later turn depends on (learnedAt = the turn whose reply first gave it, usedAt = the turn that needs it again, value = the accepted spellings, history = true when only the conversation holds it, false when the workspace still does).",
+  "about": "Ground truth for the scorer's labeled measures, written by hand from each scenario and its recording; never derived from either compactor's detector. rules: the standing rules the user gave (at = the user message, quote = a verbatim part of it, marker = a case-insensitive regular expression that a rule line holding this rule matches, liftedAt = the user message that withdrew or replaced it). values: values a later turn depends on (learnedAt = the turn whose reply first gave it, usedAt = the turn that needs it again, value = the accepted spellings, history = true when only the conversation holds it, false when the workspace still does). goal: the message that says what the session builds (at) and a case-insensitive regular expression (marker) that a state or summary still naming that goal matches anywhere.",
   "sessions": {
     "csv-toolkit": {
+      "goal": { "at": "u1", "marker": "csv toolkit" },
       "rules": [
         { "at": "u2", "quote": "Never add npm dependencies to this project.", "marker": "npm" },
         { "at": "u7", "quote": "paste the summary line (tests, pass, fail) at the end of your reply", "marker": "summary", "liftedAt": "u18" },
@@ -13,6 +14,7 @@
       ]
     },
     "py-ledger": {
+      "goal": { "at": "u1", "marker": "household ledger" },
       "rules": [
         { "at": "u2", "quote": "Always store amounts as integer cents, never as floats.", "marker": "cents" },
         { "at": "u5", "quote": "Use only the Python standard library in this project", "marker": "standard library|stdlib|pip" },
@@ -24,6 +26,7 @@
       ]
     },
     "py-mdtoc": {
+      "goal": { "at": "u1", "marker": "table[- ]of[- ]contents" },
       "rules": [
         { "at": "u3", "quote": "Don't use regular expressions for parsing the headings", "marker": "regular expression|regex" },
         { "at": "u6", "quote": "Use only the Python standard library, for tests as well.", "marker": "standard library|stdlib" },
@@ -34,6 +37,7 @@
       ]
     },
     "sh-backup": {
+      "goal": { "at": "u1", "marker": "backup rotation" },
       "rules": [
         { "at": "u2", "quote": "Always start every script with set -euo pipefail", "marker": "pipefail" },
         { "at": "u6", "quote": "Never delete anything outside the destination directory", "marker": "outside|(delet|rotat)[^\\n]*(dest|pattern|scoped)" },
@@ -44,6 +48,7 @@
       ]
     },
     "ts-logstat": {
+      "goal": { "at": "u1", "marker": "summari[sz]\\w* (?:web server )?access logs|access[- ]log summar" },
       "rules": [
         { "at": "u2", "quote": "Use tabs for indentation in every TypeScript file in this project.", "marker": "use tabs|tabs for indentation|keep tabs", "liftedAt": "u17" },
         { "at": "u4", "quote": "Tests go under tests/, one file per module in src/", "marker": "tests go under|one file per module" },
@@ -59,6 +64,7 @@
       ]
     },
     "ts-kv": {
+      "goal": { "at": "u1", "marker": "key[- ]value store" },
       "rules": [
         { "at": "u3", "quote": "Every error response must be JSON of the form", "marker": "envelope|\\{\\s*\"?error\"?\\s*:" },
         { "at": "u5", "quote": "Never add npm dependencies", "marker": "npm" },

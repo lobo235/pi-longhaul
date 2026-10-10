@@ -400,5 +400,9 @@ configures.
   on ...", or a rule word outside a question, a request for now and a withdrawal) is recorded by
   code unless the summarizer marks it a one-off, so relayed text worded as a standing rule needs no quote to land.
   After relaying or pasting third-party text, read the state's "Constraints & corrections" section.
+- Outside a `/goal`, the first Request the state recorded (by default the session's first user-role message of 40
+  or more characters) stays as the Goal line for the session's life, and no message withdraws it; an injected or
+  pasted first message is pinned there too. Its text is cut at the quote cap in the state and in every summarizer
+  prompt. Start the session with your own request, or set a `/goal`, which takes the line.
 - The config check and `status` are two commands. A process that rewrites `.git/config` between them can
   still plant a driver; such a process can already run anything it likes.

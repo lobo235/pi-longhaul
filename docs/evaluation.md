@@ -43,6 +43,7 @@ a whole count. Anything still in the kept window is not judged, since the messag
 
 | labeled field | measures | higher is |
 |---|---|---|
+| `goal` | the message that says what the session builds, once summarized: kept when any line of the state or summary still names it, by the label's marker | better |
 | `rules` | labeled rules in force at the cut (given before it, not yet lifted) that a rules-section line matches by the rule's marker | better |
 | `span`, `earlier` | the same, split into rules given in the span this compaction closes and rules given before it | better |
 | `lifts` | rules the user withdrew before the cut that no rules-section line still shows in force (a line shows a rule lifted only by words outside its quotes: a rule's own "doesn't apply to JSON" does not count) | better |
@@ -160,6 +161,7 @@ history out of 5) move by one on noise, and nothing here says how a hosted model
 
 | labeled | `state` | `state-unlearned` | `pi-default` |
 |---|---|---|---|
+| `goal` | 26/76 | 26/76 | **76**/76 |
 | `rules` | **226**/227 | 226/227 | 211/227 |
 | `span` | **21**/22 | 21/22 | 17/22 |
 | `earlier` | **205**/205 | 205/205 | 194/205 |
@@ -199,7 +201,10 @@ What it says:
   is not.
 - **Cost.** One diff call per compaction: about half the prompt tokens, a fifth of the output tokens and a
   fifth of the median time of pi's own compaction on the same spans, with a smaller result.
-- **Weak spots.** 15 rule lines were stray, mostly one-off requests kept as rules. The recorded objective
+- **Weak spots.** The session's goal was gone from 50 of the 76 states (`goal`, counted afterwards from this
+  run's saved states): the Objective showed the current request and the two before it, and once the work moved
+  past three requests the opening one, which says what is being built, fell out. pi's summary kept it every time.
+  15 rule lines were stray, mostly one-off requests kept as rules. The recorded objective
   changed at 42 of 76 compactions, and 47 of the 76 bring a new user message; the objective is the request the
   work answers now, so this mostly follows the work (a later run counting by message: 45, none backward).
 
@@ -208,6 +213,7 @@ summary of everything before the span, as when it is enabled in a session pi has
 
 | labeled | `state` | `pi-default` |
 |---|---|---|
+| `goal` | 76/76 | 76/76 |
 | `rules` | **210**/227 | 208/227 |
 | `span` | **22**/22 | 17/22 |
 | `earlier` | 188/205 | **191**/205 |
@@ -242,6 +248,34 @@ mostly named none, so values and history stay pi's strength on a takeover, and s
 requests kept as rules, are as many as before. The chained runs of the same pair (`state` 227/227 and 33/33
 lifts, `main` 217/227 and 33/33) differ less than two runs of near-identical code did (`stray` 15 at `900ead3`
 and 40 at `main`), so they are not read as a change.
+
+**This release** (2026-10-10, commit `6fab98f`: the seed floor of #14 and the Goal line of #16, same model and
+settings, one chained run and one takeover run, each with pi's own compaction alongside):
+
+| labeled | chained `state` | `state-unlearned` | `pi-default` | takeover `state` | `pi-default` |
+|---|---|---|---|---|---|
+| `goal` | **76**/76 | 76/76 | 76/76 | 76/76 | 76/76 |
+| `rules` | **220**/227 | 220/227 | 187/227 | **210**/227 | 209/227 |
+| `span` | **21**/22 | 21/22 | 16/22 | **20**/22 | 17/22 |
+| `earlier` | **199**/205 | 199/205 | 171/205 | 190/205 | **192**/205 |
+| `lifts` | 29/33 | 29/33 | **31**/33 | 22/33 | **30**/33 |
+| `values` | **8**/9 | 6/9 | 6/9 | 2/9 | **9**/9 |
+| `history` | **4**/5 | 4/5 | 3/5 | 1/5 | **5**/5 |
+| `stray` (lower is better) | 21 | 21 | — | 22 | — |
+
+The goal row was counted from the saved states: the scoring copy of the label file lacked the goal labels for
+this run. Chained, the session's goal is now in every state (26 of 76 at `900ead3`), and the rest is within the
+spread of earlier chained runs (`rules` 217 to 227, `stray` 5 to 40). `lifts` 29 is three under them: one of the
+four states that showed csv-toolkit's u7 in force recorded no lift, and the other three did lift it, but also
+kept u18, the message that lifted it, as a rule of its own ("The rule about pasting the test summary ... is
+lifted. Mention test results when something fails."), whose words match u7's marker. pi's own `rules` (187
+against 211 at `900ead3`) moved further between two runs than Longhaul's did.
+
+Taking over, stray rule lines fall from about 50 to 22 (11 in a first run of the seed floor alone, `2232e33`:
+`rules` 223, `earlier` 201, `lifts` 26), and `rules` stay level with pi's. This run had six narrative-less passes
+(the model's answer was not valid JSON), against two to four in earlier takeover runs, and a narrative-less pass
+keeps only the rules code records: most of the misses are ts-logstat's rules with no rule-shaped word, which only
+a label records. Values and lifts given before the takeover remain pi's strength there (#15 tracks the lifts).
 
 **`turns` mode** (chained, `state-turns`): `rules` 225/227, `span` 21/22, `earlier` 204/205, `lifts` 29/33,
 `values` 7/9, `history` 4/5, `stray` 5; `reused` 0.80, `facts` 0.29. It cuts stray rule lines from 15 to 5 and

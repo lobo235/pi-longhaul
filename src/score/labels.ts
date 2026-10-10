@@ -8,7 +8,9 @@
  * - a rule, when its message was summarized (before the cut) and its lift, if any, has not been given yet;
  * - a lift, when both the rule and the lift were summarized: the rule must then not be shown in force;
  * - a value, at the last compaction before the turn that uses it, when its turn was summarized and the kept window
- *   does not show it again.
+ *   does not show it again;
+ * - the goal (the message that says what the session is building), once that message was summarized: kept when any
+ *   line of the state or summary matches its marker, wherever the compactor put it.
  * Anything still in the kept window is not judged: the message itself is still in front of the model.
  */
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
@@ -19,10 +21,13 @@ import { ruleSections } from "./measures.ts";
 
 export interface RuleLabel { at: string; quote: string; marker: string; liftedAt?: string }
 export interface ValueLabel { name: string; value: string[]; learnedAt: string; usedAt: string; history: boolean }
-export interface SessionLabels { rules: RuleLabel[]; values: ValueLabel[] }
+export interface GoalLabel { at: string; marker: string }
+export interface SessionLabels { rules: RuleLabel[]; values: ValueLabel[]; goal?: GoalLabel }
 
 export interface Count { kept: number; total: number }
 export interface LabeledMeasures {
+  /** The session's goal: 1/1 kept, 0/1 missed, 0/0 not due or not labeled. */
+  goal: Count;
   rules: Count & { missed: string[] };
   /** Rules given since the previous compaction's cut: the span this compaction closes. */
   spanRules: Count;
@@ -42,17 +47,23 @@ function check(condition: boolean, message: string): void {
   if (!condition) throw new Error(`labels: ${message}`);
 }
 
+function isPattern(source: string): boolean {
+  try {
+    new RegExp(source, "i");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function checkSession(name: string, value: unknown): SessionLabels {
   const labels = value as SessionLabels;
   check(Array.isArray(labels?.rules) && Array.isArray(labels?.values), `${name} needs rules and values arrays`);
+  if (labels.goal !== undefined) check(ORDINAL.test(labels.goal?.at) && typeof labels.goal.marker === "string" && isPattern(labels.goal.marker), `${name}: the goal needs an ordinal like u1 and a marker that is a regular expression`);
   for (const rule of labels.rules) {
     check(ORDINAL.test(rule.at) && (rule.liftedAt === undefined || ORDINAL.test(rule.liftedAt)), `${name}: a rule's at/liftedAt must be an ordinal like u3`);
     check(typeof rule.quote === "string" && rule.quote.length > 0, `${name}: rule ${rule.at} has no quote`);
-    try {
-      new RegExp(rule.marker, "i");
-    } catch {
-      check(false, `${name}: rule ${rule.at} has a marker that is not a regular expression`);
-    }
+    check(isPattern(rule.marker), `${name}: rule ${rule.at} has a marker that is not a regular expression`);
   }
   for (const item of labels.values) {
     check(ORDINAL.test(item.learnedAt) && ORDINAL.test(item.usedAt), `${name}: value ${item.name} needs learnedAt/usedAt ordinals`);
@@ -152,7 +163,9 @@ export function labeledMeasures(labels: SessionLabels, candidate: Candidate, fir
   const cut = found < 0 ? candidate.pathEntries.length : found;
   const ruleLines = ruleSections(rendered).split("\n").filter((line) => line.trim() && !line.startsWith("## "));
   const strayRules = strayRulesOf(labels, ruleLines);
+  const goalDue = labels.goal !== undefined && (ordinals.at.get(labels.goal.at) ?? Number.POSITIVE_INFINITY) < cut;
   return {
+    goal: { kept: goalDue && new RegExp(labels.goal!.marker, "i").test(rendered) ? 1 : 0, total: goalDue ? 1 : 0 },
     ...measureRules(labels, ordinals, cut, previousCut(candidate), ruleLines),
     ...measureValues(labels, candidate, ordinals, cut, rendered),
     ...(strayRules ? { strayRules } : {}),
@@ -161,6 +174,7 @@ export function labeledMeasures(labels: SessionLabels, candidate: Candidate, fir
 
 export interface LabeledSummary {
   rows: number;
+  goal: Count;
   rules: Count;
   spanRules: Count;
   earlierRules: Count;
@@ -179,6 +193,8 @@ export function summarizeLabeled(rows: ReadonlyArray<{ labeled?: LabeledMeasures
   const zero = { kept: 0, total: 0 };
   return labeled.reduce<LabeledSummary>((sum, row) => ({
     rows: sum.rows + 1,
+    // Rows a scorer wrote before the goal was measured have none.
+    goal: add(sum.goal, row.goal ?? zero),
     rules: add(sum.rules, row.rules),
     spanRules: add(sum.spanRules, row.spanRules),
     earlierRules: add(sum.earlierRules, row.earlierRules),
@@ -186,11 +202,11 @@ export function summarizeLabeled(rows: ReadonlyArray<{ labeled?: LabeledMeasures
     values: add(sum.values, row.values),
     historyValues: add(sum.historyValues, row.historyValues),
     strayRules: sum.strayRules + (row.strayRules?.length ?? 0),
-  }), { rows: 0, rules: zero, spanRules: zero, earlierRules: zero, lifts: { honoured: 0, total: 0 }, values: zero, historyValues: zero, strayRules: 0 });
+  }), { rows: 0, goal: zero, rules: zero, spanRules: zero, earlierRules: zero, lifts: { honoured: 0, total: 0 }, values: zero, historyValues: zero, strayRules: 0 });
 }
 
 const ratio = (count: Count) => `${count.kept}/${count.total}`;
 
 export function formatLabeledLine(arm: string, s: LabeledSummary): string {
-  return `${arm.padEnd(15)} labeled n=${s.rows} rules=${ratio(s.rules)} span=${ratio(s.spanRules)} earlier=${ratio(s.earlierRules)} lifts=${s.lifts.honoured}/${s.lifts.total} values=${ratio(s.values)} history=${ratio(s.historyValues)} stray=${s.strayRules}`;
+  return `${arm.padEnd(15)} labeled n=${s.rows} goal=${ratio(s.goal)} rules=${ratio(s.rules)} span=${ratio(s.spanRules)} earlier=${ratio(s.earlierRules)} lifts=${s.lifts.honoured}/${s.lifts.total} values=${ratio(s.values)} history=${ratio(s.historyValues)} stray=${s.strayRules}`;
 }

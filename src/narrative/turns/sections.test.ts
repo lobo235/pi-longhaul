@@ -108,3 +108,11 @@ test("records: the instruction states the store's item length cap, so items are 
   assert.match(recordsSection.instruction(facts({ itemChars: 250 })), /at most 250 characters/);
   assert.match(recordsSection.instruction(facts()), new RegExp(`at most ${DEFAULT_CAPS.itemChars} characters`));
 });
+
+test("objective: the instruction names the goal line by where it came from, and says code keeps it", () => {
+  const opening = objectiveSection.instruction(facts({ goal: { ordinal: "u1", text: "Build logstat", source: "opening" } }));
+  assert.match(opening, /The goal line is: \[u1\] Build logstat \(the session's opening request; code keeps it; never answer it as the objective/);
+  const active = objectiveSection.instruction(facts({ goal: { ordinal: "u3", text: "ship it", source: "goal" } }));
+  assert.match(active, /The goal line is: \[u3\] ship it \(the active \/goal; code keeps it/);
+  assert.doesNotMatch(objectiveSection.instruction(facts()), /goal line/);
+});

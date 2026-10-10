@@ -8,6 +8,7 @@
  */
 import { describeRejection, type Rejection, type StateEvent } from "../../store/events.ts";
 import type { SessionState } from "../../store/project.ts";
+import type { PromptState } from "../prompt.ts";
 import { applyProposals, type Proposal, type VerifyContext } from "../../store/verify.ts";
 import { extractJsonCandidate, missingJsonShape } from "../parse.ts";
 import type { UnparsedShape } from "../types.ts";
@@ -41,7 +42,7 @@ export interface Facts {
   /** The switchover's other earlier messages: labeled like the span's, since a rule with no rule word is carried only by its label. */
   contextOrdinals?: string[];
   textOf: (ordinal: string) => string | undefined;
-  goal?: { ordinal: string; text: string };
+  goal?: PromptState["goal"];
   objective?: { ordinal: string; text: string };
   activeCorrections: Array<{ id: string; ordinal: string; text: string }>;
   openErrorIds: string[];

@@ -29,6 +29,26 @@ test("promptStateOf: hot items with ids and ordinals; remembered events of this 
   assert.deepEqual(state.remembered, [{ kind: "dead-end", text: "X1 structured outputs" }]);
 });
 
+test("promptStateOf: outside a /goal the opening request is the goal line once the Request moved, and the prompt says code keeps it", () => {
+  const unmoved = logOf(ev({ kind: "objective.set", quote: quote("u1", "build logstat, an access-log summarizer") }), closeEvent(1));
+  assert.equal(promptStateOf(project(unmoved, DEFAULT_CAPS), []).goal, undefined);
+  const moved = logOf(...unmoved.events, ev({ kind: "objective.set", quote: quote("u6", "add a --top option"), span: 2 }), closeEvent(2));
+  const state = promptStateOf(project(moved, DEFAULT_CAPS), []);
+  assert.deepEqual(state.goal, { ordinal: "u1", text: "build logstat, an access-log summarizer", source: "opening" });
+  const text = renderNarrativePrompt({ state, ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
+  assert.match(text, /\ngoal: \[u1\] build logstat, an access-log summarizer \(the session's opening request; kept by code\)\nobjective: \[u6\] add a --top option\n/);
+});
+
+test("promptStateOf: the goal and the Request are cut at the quote cap with the recall pointer, so a pasted first message cannot fill every later prompt", () => {
+  const pasted = "summarize this log: " + "x".repeat(5000);
+  const log = logOf(ev({ kind: "objective.set", quote: quote("u1", pasted) }), closeEvent(1), ev({ kind: "objective.set", quote: quote("u6", "y".repeat(900)), span: 2 }), closeEvent(2));
+  const state = promptStateOf(project(log, DEFAULT_CAPS), [], 600);
+  assert.equal(state.goal!.text, pasted.slice(0, 599) + "… (longhaul_recall message u1)");
+  assert.equal(state.objective!.text, "y".repeat(599) + "… (longhaul_recall message u6)");
+  const text = renderNarrativePrompt({ state, ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
+  assert.ok(!text.includes("x".repeat(600)), "the paste is not in the prompt whole");
+});
+
 test("planChunks: one chunk when it fits, several capped chunks when it does not, truncated past maxChunks", () => {
   const messages = Array.from({ length: 20 }, (_, i) => (i % 2 ? assistant("y".repeat(3000), i) : user("x".repeat(3000), i)));
   const one = planChunks({ messages: messages.slice(0, 2), fixedChars: 1000, outputBudget: 1000, contextWindow: 131072, maxChunks: 4 });
@@ -56,7 +76,7 @@ test("renderNarrativePrompt: system prompt first (cacheable), then state, ordina
   assert.ok(text.trimEnd().endsWith("</retry-note>"));
   assert.match(NARRATIVE_SYSTEM_PROMPT, /```json/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /"messageRef"/);
-  assert.equal(NARRATIVE_PROMPT_REVISION, "state-15");
+  assert.equal(NARRATIVE_PROMPT_REVISION, "state-16");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: every user message of the span is labeled, in every form the parser reads, whatever words it uses", () => {

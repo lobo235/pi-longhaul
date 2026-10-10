@@ -116,6 +116,30 @@ test("render: a /goal is the Goal line; a Request that IS the goal (pre-split tr
   assert.equal(text.split(goalText).length - 1, 1, "the goal text renders once");
 });
 
+test("render: outside a /goal the opening request stays as the Goal line however often the Request moves", () => {
+  const opening = "Let's build logstat, a CLI that summarizes web server access logs.";
+  const state = project(logOf(
+    ev({ kind: "objective.set", quote: quote("u1", opening) }),
+    closeEvent(1),
+    ev({ kind: "objective.set", quote: quote("u6", "add a --top option"), span: 2 }),
+    closeEvent(2),
+    ev({ kind: "objective.set", quote: quote("u9", "add a --since option"), span: 3 }),
+    closeEvent(3),
+    ev({ kind: "objective.set", quote: quote("u12", "add a --json option"), span: 4 }),
+    closeEvent(4),
+  ), DEFAULT_CAPS);
+  const text = render({ ...fullInput(), state });
+  assert.match(text, /## Objective \(u12, moved from u9 at span 4\)\nGoal \(u1, the session's opening request\): "Let's build logstat, a CLI that summarizes web server access logs\."\nRequest \(u12\): "add a --json option"\n/);
+  assert.match(text, /Earlier requests[^\n]*\n- u9 "add a --since option"\n- u6 "add a --top option"\n## /);
+  assert.equal(text.split(opening).length - 1, 1, "the opening request renders once");
+});
+
+test("render: a Request that never moved is the goal itself and is not repeated as a Goal line", () => {
+  const text = render(fullInput());
+  assert.doesNotMatch(text, /^Goal /m);
+  assert.match(text, /## Objective \(u1, unchanged since span \d+\)\n> "Build the CSV importer beside the JSON one\."/);
+});
+
 test("render: the precedence line says a test, build or commit result counts only with its evidence id", () => {
   const text = render(fullInput());
   const line = text.split("\n")[1];
