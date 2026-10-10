@@ -13,6 +13,7 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { MIN_QUOTE_CHARS, type Quote, type Rejection } from "./store/events.ts";
 import type { QuoteChecker } from "./store/log.ts";
 import type { QuoteResolution, QuoteResolver } from "./store/verify.ts";
+import { WITHDRAWAL_CUE } from "./store/lift-vocabulary.ts";
 
 export interface IndexedUserMessage {
   ordinal: string;
@@ -122,7 +123,34 @@ export function quotableText(text: string): string {
 }
 
 /** Words that make a user message read as a standing rule. A pointer for the model, never a verdict: quotes are still verified. */
-export const RULE_SHAPE_RE = /\b(never|always|don'?t|do not|must|stop|instead|only)\b/i;
+export const RULE_SHAPE_RE = /\b(never|always|don'?t|do not|must|stop|only)\b/i;
+const RULE_WORDS = new RegExp(RULE_SHAPE_RE.source, "gi");
+/** Words that say a rule holds from here on, with or without a rule word ("from now on every option gets a row"). */
+const STANDING_RE = /\b(?:from (?:now|here|this point) on|going forward)\b/i;
+/** Words that say a request is for now only: "don't commit yet", "stop the watcher for the moment". */
+const FOR_NOW_RE = /\b(?:yet|for now|right now|for the moment|at the moment|this time|just this once)\b/i;
+/** A rule word that only describes a thing: "an option that keeps only lines", "never mind". */
+const DESCRIBES_RE = /\b(?:that|which)\s+\w+s\s+$/i;
+const IDIOM_RE = /^never\s+mind\b/i;
+
+/**
+ * Whether a user message says what holds from now on, sentence by sentence: a sentence with a standing marker, or with a
+ * rule word that is not in a question, a request for now or a withdrawal (a lift, which the model labels), not "never
+ * mind" and not describing a thing. "Instead" is no rule word: "skip bad lines instead of throwing" asks for one change. The floor
+ * records every message this accepts unless the model calls it a one-off, so it errs towards leaving a message to the
+ * model's own label (earlierOtherMessages) rather than recording a request as a rule.
+ */
+export function readsAsStandingRule(text: string): boolean {
+  return sentencesOf(text).some(({ body, question }) => {
+    if (question || FOR_NOW_RE.test(body) || body.search(WITHDRAWAL_CUE) !== -1) return false;
+    if (STANDING_RE.test(body)) return true;
+    return [...body.matchAll(RULE_WORDS)].some((match) => !IDIOM_RE.test(body.slice(match.index)) && !DESCRIBES_RE.test(body.slice(0, match.index)));
+  });
+}
+
+function sentencesOf(text: string): Array<{ body: string; question: boolean }> {
+  return [...text.matchAll(/(?:[^.!?]|[.!?](?![.!?]*(?:\s|$)))+[.!?]*/g)].map((match) => ({ body: match[0], question: match[0].trimEnd().endsWith("?") })).filter(({ body }) => body.trim() !== "");
+}
 export const EARLIER_RULE_MAX_CHARS = 600;
 export const EARLIER_RULES_TOTAL_CHARS = 6000;
 
@@ -138,7 +166,7 @@ export function earlierRuleMessages(messages: IndexedUserMessage[], fromOrdinal:
   let used = 0;
   for (const message of [...before].reverse()) {
     const text = normalizeWs(quotableText(message.text));
-    if (text.length < 12 || text.length > EARLIER_RULE_MAX_CHARS || !RULE_SHAPE_RE.test(text)) continue;
+    if (text.length < 12 || text.length > EARLIER_RULE_MAX_CHARS || !readsAsStandingRule(text)) continue;
     if (used + text.length > EARLIER_RULES_TOTAL_CHARS) break;
     used += text.length;
     picked.unshift({ ordinal: message.ordinal, text });

@@ -453,7 +453,7 @@ test("runStatePass: on a switchover the model sees the user's other earlier mess
 
 /** A switchover where an earlier rule-shaped message (offered as a seed rule) replaced an earlier plain rule. */
 function switchoverReplacedInput(): PassInput {
-  const earlier = [userEntry("m0", "Indent every file with tabs."), assistantEntry("a0", "understood"), userEntry("m00", "Switch every file to two-space indentation instead of tabs."), assistantEntry("a00", "switched"), compactionEntry("c0", { compactor: "another-compactor" })];
+  const earlier = [userEntry("m0", "Indent every file with tabs."), assistantEntry("a0", "understood"), userEntry("m00", "Switch every file to two-space indentation instead of tabs from now on."), assistantEntry("a00", "switched"), compactionEntry("c0", { compactor: "another-compactor" })];
   const span = branch();
   const entries = chain([...earlier, ...span]);
   const messages = span.filter((entry) => entry.type === "message").map((entry) => (entry as { message: AgentMessage }).message);
@@ -509,7 +509,7 @@ test("runStatePass: on a switchover an earlier rule-shaped message labeled \"not
  * failed pass) over u3, a new rule; then this span. Only the gap since Longhaul's last compaction is a switchover.
  */
 async function afterFallbackInput(firstDeps: PassDeps = answering({})): Promise<PassInput> {
-  const own = chain([userEntry("m0", "never mind the timing for now, just make it parse"), assistantEntry("a0", "ok"), userEntry("m1", "carry on with the parser"), assistantEntry("a1", "done")]);
+  const own = chain([userEntry("m0", "never commit generated files, keep them ignored"), assistantEntry("a0", "ok"), userEntry("m1", "carry on with the parser"), assistantEntry("a1", "done")]);
   const first = await runStatePass(inputOf(own), firstDeps);
   assert.deepEqual(carried(first), [], "Longhaul's own pass recorded no rule from u1");
   const gap = [userEntry("m3", "never push straight to main, open a branch"), assistantEntry("a3", "ok"), compactionEntry("c2", { compactor: "another-compactor" })];
@@ -529,7 +529,7 @@ test("runStatePass: after a fallback, the switchover floor offers only the messa
 test("runStatePass: after a fallback, the messages of a Longhaul span that closed narrative-less are still offered: it never judged them", async () => {
   const silent = depsOf({ call: { complete: async () => textResponse("no json here") as never } });
   const result = await runStatePass(await afterFallbackInput(silent), answering({}));
-  assert.deepEqual(carried(result), ["u1 never mind the timing for now, just make it parse", "u3 never push straight to main, open a branch"]);
+  assert.deepEqual(carried(result), ["u1 never commit generated files, keep them ignored", "u3 never push straight to main, open a branch"]);
 });
 
 test("runStatePass: on a switchover a value the previous summary carried is kept when an earlier turn shows it; one only the summary states is not", async () => {
