@@ -4,7 +4,7 @@ import path from "node:path";
 
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
-import { localOnlyRootOf } from "../narrative/route-config.ts";
+import { homeDirectory, localOnlyRootOf } from "../narrative/route-config.ts";
 import { isRouteProvider } from "../narrative/routing.ts";
 import type { SessionLabels } from "./labels.ts";
 
@@ -56,7 +56,7 @@ export function readTranscript(file: string): SessionEntry[] {
 }
 
 /** A transcript whose directory is unknown, empty or relative counts as local-only: the scorer's model may be remote, so it fails closed. */
-const isLocalOnlyIn = (roots: readonly string[]) => (cwd: string | undefined): boolean => !cwd?.trim() || !path.isAbsolute(cwd.trim()) || localOnlyRootOf(cwd, roots) !== undefined;
+const isLocalOnlyIn = (roots: readonly string[]) => (cwd: string | undefined): boolean => !cwd?.trim() || !path.isAbsolute(cwd.trim()) || localOnlyRootOf(cwd, roots, homeDirectory()) !== undefined;
 
 export function pathTo(entries: SessionEntry[], leafId: string): SessionEntry[] {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
