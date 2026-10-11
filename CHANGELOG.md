@@ -8,6 +8,22 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.0.1] - 2026-10-10
+
+### Added
+
+- A cross-version smoke (`npm run cross-version`), run by CI on every push and by the nightly job with the newest
+  pi: one transcript handed through every pi in `pi-compat.json`, oldest to newest and back, with a Longhaul
+  compaction by each. Every step must compact with an accepted diff, and the finished transcript must read back
+  with one span per compaction and no anomaly.
+
+### Changed
+
+- Tested with pi 0.87.1, 0.99.0, 0.99.1, 0.99.2, 1.0.0, 1.0.1, 1.0.2, 1.0.3, 1.0.4 and 1.1.0; 0.99.0, 0.99.2 and
+  1.0.3 are newly recorded in `pi-compat.json`. No code changes to the extension.
+- Published from the release workflow through npm trusted publishing, so this version carries a provenance
+  attestation linking it to its source commit. v1.0.0 was published by hand and has none.
+
 ## [v1.0.0] - 2026-10-10
 
 ### Added

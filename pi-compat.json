@@ -60,6 +60,30 @@
         "npm run smoke: one compaction by pi 1.1.0 of the packed package, fake model",
         "one real compaction through pi --mode rpc on the setup-check fixture with a local model: a compaction record, no fallback"
       ]
+    },
+    {
+      "pi": "0.99.0",
+      "date": "2026-10-10",
+      "how": [
+        "npm test on the vendored pi: typecheck, unit suite, load smoke and the extension-API contract checks; no contract moved",
+        "npm run smoke: one real compaction by that pi in a fresh agent dir, against a fake model; the diff was accepted"
+      ]
+    },
+    {
+      "pi": "0.99.2",
+      "date": "2026-10-10",
+      "how": [
+        "npm test on the vendored pi: typecheck, unit suite, load smoke and the extension-API contract checks; no contract moved",
+        "npm run smoke: one real compaction by that pi in a fresh agent dir, against a fake model; the diff was accepted"
+      ]
+    },
+    {
+      "pi": "1.0.3",
+      "date": "2026-10-10",
+      "how": [
+        "npm test on the vendored pi: typecheck, unit suite, load smoke and the extension-API contract checks; no contract moved",
+        "npm run smoke: one real compaction by that pi in a fresh agent dir, against a fake model; the diff was accepted"
+      ]
     }
   ]
 }

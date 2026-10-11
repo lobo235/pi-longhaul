@@ -27,7 +27,8 @@ only on synthetic sessions (see [docs/evaluation.md](docs/evaluation.md)).
 - `src/ledger/`: commands, errors and the World, recorded by code. `src/learned*.ts`: Learned values.
 - `src/narrative/`: the model call that writes the Diff, its prompt, parsing, verification and routing.
 - `src/store/`: the state's custom entries on the transcript. `src/score/`: the offline scorer. The scorer, `src/state-cli.ts` and every `test-support.ts` are clone-only: `package.json` `files` leaves them out and `npm run check-pack` fails if one ships.
-- `scripts/`: the smoke, the package check, the fixture generator, `record-pi-version.ts`.
+- `scripts/`: the compaction smoke and the cross-version smoke (sharing `smoke-harness.ts`), the package check, the
+  fixture generator, `record-pi-version.ts`.
 - `eval/`: the synthetic evaluation sessions, their scenarios, and the recorder and checker that made them (see `eval/README.md`).
 - `pi-compat.json`: the pi versions Longhaul is verified against. `docs/adr/`: decisions; `docs/security.md`:
   threats T1-T8.

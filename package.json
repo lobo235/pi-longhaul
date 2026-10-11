@@ -1,6 +1,6 @@
 {
   "name": "pi-longhaul",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Keep pi sessions working all night. A compactor that carries your session forward instead of rewriting it: your rules kept in your own words, the state written by code, old reasoning left behind, and about 5x faster than pi's own compaction on a local model.",
   "type": "module",
   "license": "MIT",
@@ -32,7 +32,7 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.0.0/.github/assets/infographic.png"
+    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.0.1/.github/assets/infographic.png"
   },
   "files": [
     "src/**/*.ts",
@@ -62,7 +62,8 @@
     "score": "pi --no-session --model ${SCORE_MODEL:?set SCORE_MODEL=provider/model-id[:thinking]} -e ./src/score/score-run.ts",
     "evidence": "pi --no-session --model ${SCORE_MODEL:?set SCORE_MODEL=provider/model-id} -e ./src/score/evidence-run.ts",
     "smoke": "node scripts/compaction-smoke.ts",
-    "check-pack": "node scripts/check-pack.ts"
+    "check-pack": "node scripts/check-pack.ts",
+    "cross-version": "node scripts/cross-version-smoke.ts"
   },
   "engines": {
     "node": ">=22.19.0"
