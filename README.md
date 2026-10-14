@@ -361,7 +361,7 @@ listed in [pi-compat.json](pi-compat.json). On a listed line it runs silently. O
 per session and runs; a session that opted out of it (`PI_COMPACTOR=pi`) is not warned. If a compaction fails, pi's own compaction takes over. A nightly job tests against the
 newest pi and opens an issue when it breaks.
 
-Tested with pi 0.87.1, 0.99.0, 0.99.1, 0.99.2, 1.0.0, 1.0.1, 1.0.2, 1.0.3, 1.0.4 and 1.1.0. Upgrading or
+Tested with pi 0.87.1, 0.99.0, 0.99.1, 0.99.2, 1.0.0, 1.0.1, 1.0.2, 1.0.3, 1.0.4, 1.1.0 and 1.2.0. Upgrading or
 downgrading pi mid-project is covered too: CI hands one transcript through every listed pi, oldest to newest and
 back, with a Longhaul compaction by each, and each must continue what the others wrote.
 

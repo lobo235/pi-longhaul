@@ -8,6 +8,14 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.0.2] - 2026-10-13
+
+### Changed
+
+- Tested with pi 1.2.0, now recorded in `pi-compat.json`. No code changes to the extension: 1.2.0 fires
+  `before_agent_start` for runs a custom message starts as well (pi#5581), and Longhaul does not use that event. A
+  test stand-in for pi-goal that read the event's prompt now skips the custom-message variant.
+
 ## [v1.0.1] - 2026-10-10
 
 ### Added

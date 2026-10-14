@@ -53,6 +53,8 @@ function piGoalStandIn(goalText: string): ExtensionFactory {
   return (pi: ExtensionAPI) => {
     let recorded = false;
     pi.on("before_agent_start", (event) => {
+      // From pi 1.2.0 a run a custom message starts fires this too, and that event carries no prompt.
+      if (!("prompt" in event)) return;
       if (event.prompt.includes("<goal_objective>") && !recorded) {
         recorded = true;
         pi.appendEntry("goal-state", { goal: { id: "goal-1", text: goalText, status: "active" } });
