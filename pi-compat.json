@@ -84,6 +84,15 @@
         "npm test on the vendored pi: typecheck, unit suite, load smoke and the extension-API contract checks; no contract moved",
         "npm run smoke: one real compaction by that pi in a fresh agent dir, against a fake model; the diff was accepted"
       ]
+    },
+    {
+      "pi": "1.2.0",
+      "date": "2026-10-14",
+      "how": [
+        "npm test on the vendored pi; one contract moved in a test only (before_agent_start became a union on messageType, pi#5581; the pi-goal stand-in now skips the custom-message event)",
+        "npm run smoke and npm run cross-version -- --extra 1.2.0: every listed pi continues 1.2.0's transcripts and it continues theirs",
+        "one real compaction through pi --mode rpc on the setup-check fixture with a local model: a compaction record, no fallback"
+      ]
     }
   ]
 }
