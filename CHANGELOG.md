@@ -8,6 +8,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.0.2] - 2026-10-13
+
 ### Changed
 
 - Tested with pi 1.2.0, now recorded in `pi-compat.json`. No code changes to the extension: 1.2.0 fires
