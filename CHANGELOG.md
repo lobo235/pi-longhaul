@@ -8,6 +8,12 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+### Fixed
+
+- The load smoke (`npm run load-smoke`, a development check that is not part of the package) resolved a
+  wildcard `exports` target by replacing only its first `*`; it now replaces every one, as Node does (CodeQL
+  `js/incomplete-sanitization`). No pi package uses a target with two, so the smoke's results are unchanged.
+
 ## [v1.0.2] - 2026-10-13
 
 ### Changed
