@@ -99,7 +99,8 @@
       "date": "2026-10-16",
       "how": [
         "npm test on the vendored pi (the version gate skipped): typecheck, unit suite, load smoke and the extension-API contract checks",
-        "npm run smoke: one real compaction by that pi in a fresh agent dir, against a fake model; the diff was accepted"
+        "npm run smoke and npm run cross-version -- --extra 1.3.0: every listed pi continues 1.3.0's transcripts and it continues theirs",
+        "one real compaction through pi --mode rpc on the setup-check fixture with a local model: a compaction record, no fallback"
       ]
     }
   ]
