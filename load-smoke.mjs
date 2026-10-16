@@ -84,7 +84,8 @@ function resolveFromPi(specifier) {
           const suffix = pattern.slice(star + 1);
           if (!sub.startsWith(prefix) || !sub.endsWith(suffix)) continue;
           const rest = sub.slice(prefix.length, sub.length - suffix.length);
-          const file = (typeof val === "string" ? val : val.import ?? val.default)?.replace("*", rest);
+          // Every "*" in the target, as Node does; a function, so a "$" in the match stays literal.
+          const file = (typeof val === "string" ? val : val.import ?? val.default)?.replaceAll("*", () => rest);
           if (typeof file === "string") return path.join(pkgDir, file);
         }
       }
