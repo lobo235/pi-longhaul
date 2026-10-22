@@ -6,6 +6,7 @@
  * Retirement is a projection rule: the log never deletes, and recall reads the log.
  */
 import type { Caps, ForeignCompactor, Now, Quote, Source, StateEvent, StateLog, World } from "./events.ts";
+import { DEFAULT_NEAR_DUPLICATE_THRESHOLD, overlap, tokenize } from "./near-duplicate.ts";
 import { oneLine } from "../one-line.ts";
 
 export interface CorrectionItem {
@@ -17,6 +18,10 @@ export interface CorrectionItem {
   seq: number;
   liftedBy?: { messageId: string; ordinal: string; span: number };
   retired: boolean;
+  /** Ids this rule held before being recorded again from its message (addCorrection); see liftTarget. */
+  formerIds?: Set<string>;
+  /** `span:seq` of the earlier correction.add events folded into this rule, for recall (addCorrection). */
+  copyKeys?: string[];
 }
 
 export interface TextItem {
@@ -108,6 +113,70 @@ function applyClose(state: SessionState, event: Extract<StateEvent, { kind: "spa
   consolidateWorkLog(state, caps);
 }
 
+/**
+ * A rule recorded again from the message that gave it is the same rule: passes that lost their fold's span records
+ * were shown the message again and recorded it again under a new id, sometimes in other words, so a restored log
+ * holds one copy per such span. The rule takes the newest copy's id, span and place, and keeps its older ids for a lift
+ * naming one; a lifted rule stays lifted, as verify.ts keeps it for a new pass.
+ */
+/**
+ * The newest standing or lifted rule `quote` repeats: one from the same message whose words are a near-duplicate
+ * (near-duplicate.ts, at verify's default threshold; two rules one message gave passed that check against each
+ * other when recorded). A rule retired by the cap is not matched, so a later copy brings it back.
+ */
+function sameRuleIndex(corrections: CorrectionItem[], quote: Quote): number {
+  for (let index = corrections.length - 1; index >= 0; index--) {
+    const item = corrections[index];
+    if (item.retired && !item.liftedBy) continue;
+    if (isSameRule(item.quote, quote)) return index;
+  }
+  return -1;
+}
+
+/** Whether two recorded rules are one: the same message, in the same or near-duplicate words. */
+export function isSameRule(a: Quote, b: Quote): boolean {
+  if (a.messageId !== b.messageId) return false;
+  return a.text === b.text || overlap(tokenize(a.text), tokenize(b.text)) >= DEFAULT_NEAR_DUPLICATE_THRESHOLD;
+}
+
+/** An event's key in the log: its seq is unique within its span (log.ts seqKey). */
+export const eventKey = (event: { span: number; seq: number }): string => `${event.span}:${event.seq}`;
+
+/**
+ * The rule a lift naming `target` lands on, for verify.ts, which judges the lift against it, and for the
+ * projection, which applies it, so the two never differ: the newest holder of the id (an old transcript can carry
+ * a reminted one, security.md T1), and only when no rule holds it now, the newest that held it before being
+ * recorded again. A former id another rule holds now names that rule: the lifting pass saw only that one.
+ */
+export function liftTarget(corrections: CorrectionItem[], target: string): CorrectionItem | undefined {
+  return newestWhere(corrections, (item) => item.id === target) ?? newestWhere(corrections, (item) => item.formerIds?.has(target) ?? false);
+}
+
+function newestWhere(corrections: CorrectionItem[], match: (item: CorrectionItem) => boolean): CorrectionItem | undefined {
+  for (let index = corrections.length - 1; index >= 0; index--) if (match(corrections[index])) return corrections[index];
+  return undefined;
+}
+
+function addCorrection(state: SessionState, event: Extract<StateEvent, { kind: "correction.add" }>, caps: Caps): void {
+  state.cursor.R = Math.max(state.cursor.R, idNumber(event.id));
+  const index = sameRuleIndex(state.corrections, event.quote);
+  const earlier = index < 0 ? undefined : state.corrections[index];
+  if (earlier?.liftedBy) {
+    (earlier.copyKeys ??= []).push(eventKey(event));
+    return;
+  }
+  // The new item takes over the earlier one's lists, grown in place: copying them per copy would make N copies of
+  // one rule cost N² (security.md T4).
+  if (earlier) state.corrections.splice(index, 1);
+  const formerIds = earlier?.formerIds ?? new Set<string>();
+  if (earlier) formerIds.add(earlier.id);
+  formerIds.delete(event.id);
+  const copyKeys = earlier?.copyKeys ?? [];
+  if (earlier) copyKeys.push(eventKey(earlier));
+  state.corrections.push({ id: event.id, quote: event.quote, span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false, ...(formerIds.size ? { formerIds } : {}), ...(copyKeys.length ? { copyKeys } : {}) });
+  state.retired.corrections += retireOverCap(state.corrections, caps.corrections);
+}
+
 export function applyEvent(previous: SessionState, event: StateEvent, caps: Caps): SessionState {
   const state: SessionState = structuredClone(previous);
   applyInPlace(state, event, caps);
@@ -116,7 +185,7 @@ export function applyEvent(previous: SessionState, event: StateEvent, caps: Caps
 
 /** Fold one event into `state`, mutating it. The new state can share objects with the event. */
 function applyInPlace(state: SessionState, event: StateEvent, caps: Caps): void {
-  state.seq = event.seq;
+  state.seq = Math.max(state.seq, event.seq);
   switch (event.kind) {
     case "goal.set":
       state.goal = { quote: event.quote, setSpan: event.span };
@@ -131,15 +200,12 @@ function applyInPlace(state: SessionState, event: StateEvent, caps: Caps): void 
       if (state.objective) state.objective.doneWhen = event.quote;
       break;
     case "correction.add":
-      state.corrections.push({ id: event.id, quote: event.quote, span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false });
-      state.cursor.R = Math.max(state.cursor.R, idNumber(event.id));
-      state.retired.corrections += retireOverCap(state.corrections, caps.corrections);
+      addCorrection(state, event, caps);
       break;
     case "correction.lift": {
-      // Newest first: older transcripts can hold two corrections with one id (a foreign close dropped
-      // the first, the cursor fell back and reminted it; the fold now keeps both). A lift recorded then could only
-      // see the newer one, so the newest holder is the target (security.md T1).
-      const target = [...state.corrections].reverse().find((item) => item.id === event.target);
+      // Older transcripts can hold two corrections with one id (a foreign close dropped the first, the cursor fell
+      // back and reminted it; the fold keeps both): liftTarget picks the one the lifting pass saw.
+      const target = liftTarget(state.corrections, event.target);
       if (target) target.liftedBy = { ...event.by, span: event.span };
       break;
     }

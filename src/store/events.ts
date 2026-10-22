@@ -229,10 +229,13 @@ function isEventBody(event: Rec): boolean {
   }
 }
 
+/** A span or seq: a whole number from 1, so a replayed `1e999` (Infinity) cannot stall the numbering after it. */
+const isCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 1;
+
 /** Shape check for replayed entries: a malformed one is skipped and counted by the fold, never thrown. */
 export function isStateEvent(value: unknown): value is StateEvent {
   if (!isRec(value)) return false;
-  const provenanceOk = (value.source === "remember" || value.source === "diff" || value.source === "pass") && typeof value.span === "number" && typeof value.at === "string" && typeof value.seq === "number";
+  const provenanceOk = (value.source === "remember" || value.source === "diff" || value.source === "pass") && isCount(value.span) && typeof value.at === "string" && isCount(value.seq);
   return provenanceOk && isEventBody(value);
 }
 

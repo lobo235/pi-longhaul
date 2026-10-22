@@ -39,6 +39,11 @@ extension.
   reading it into memory.
 - A timestamp a `Date` cannot hold is dropped rather than thrown on.
 - An id held by two entries (an old transcript can carry a re-minted id) resolves to the newest holder.
+- A rule recorded again from the message that gave it (near-duplicate words) folds into that rule; a copy of a
+  lifted rule stays lifted, so restored span records cannot bring back a rule the user withdrew from a copy. A lift
+  lands on the rule holding its id now, and on one that held it before only when none does: the store judges the
+  lift against that same rule, and `longhaul_recall` marks lifted what the state lifted.
+- A span or seq that is not a whole number from 1 (`1e999` parses as Infinity) makes the event malformed.
 - An entry from a newer state format is refused by name, so a downgrade starts clean rather than misreading.
 - Learned values read back from a transcript are checked again (length, printable ASCII, count). A name is
   checked as when it was given and dropped if it fails, and a named value must still have a value's shape.

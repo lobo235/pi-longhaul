@@ -7,6 +7,7 @@ import type { CommandRecord, ErrorRecord } from "../ledger/handoff.ts";
 import type { Caps, StateEvent, StateLog } from "./events.ts";
 import { orderedFiles } from "../files-render.ts";
 import { oneLine as sanitize } from "../one-line.ts";
+import { eventKey, project } from "./project.ts";
 
 export type RecallWhat = "span" | "commands" | "errors" | "decisions" | "dead-ends" | "corrections" | "message" | "files" | "all";
 
@@ -39,28 +40,31 @@ export interface RecallHit {
 export const RECALL_DEFAULT_LIMIT = 20;
 
 
+/** One projection per recall call, however many kinds it lists (`all`). */
+const liftedKeysCache = new WeakMap<RecallDeps, Set<string>>();
+
 /**
- * The seqs of the corrections a lift landed on, over the WHOLE log (a lift can sit in a later span than its rule).
- * Same rule as the projection: the newest earlier holder of the id, because an older transcript can hold two
- * corrections with one id (security.md T1).
+ * `span:seq` of every correction.add the projection lifted, the copies folded into a lifted rule included, so recall
+ * shows a correction as lifted exactly when the state does (project.ts liftTarget, addCorrection).
  */
-function liftedSeqs(events: StateEvent[]): Set<number> {
-  const seen: Array<{ id: string; seq: number }> = [];
-  const lifted = new Set<number>();
-  for (const event of events) {
-    if (event.kind === "correction.add") seen.push({ id: event.id, seq: event.seq });
-    if (event.kind !== "correction.lift") continue;
-    const target = [...seen].reverse().find((item) => item.id === event.target);
-    if (target) lifted.add(target.seq);
+function liftedKeys(deps: RecallDeps): Set<string> {
+  const cached = liftedKeysCache.get(deps);
+  if (cached) return cached;
+  const keys = new Set<string>();
+  liftedKeysCache.set(deps, keys);
+  for (const item of project(deps.log, deps.caps).corrections) {
+    if (!item.liftedBy) continue;
+    keys.add(eventKey(item));
+    for (const key of item.copyKeys ?? []) keys.add(key);
   }
-  return lifted;
+  return keys;
 }
 
-function itemHits(events: StateEvent[], kind: "decisions" | "dead-ends" | "corrections", lifted: Set<number>): RecallHit[] {
+function itemHits(events: StateEvent[], kind: "decisions" | "dead-ends" | "corrections", lifted: Set<string>): RecallHit[] {
   return events.flatMap((event): RecallHit[] => {
     if (kind === "decisions" && event.kind === "decision.add") return [{ kind, ref: event.id, span: event.span, text: `${event.id} ${sanitize(event.text)}${event.evidence ? ` (${event.evidence})` : ""}` }];
     if (kind === "dead-ends" && event.kind === "deadEnd.add") return [{ kind, ref: event.id, span: event.span, text: `${event.id} ${sanitize(event.text)}${event.evidence ? ` (${event.evidence})` : ""}` }];
-    if (kind === "corrections" && event.kind === "correction.add") return [{ kind, ref: event.id, span: event.span, text: `${event.id} [${event.quote.ordinal}] ${sanitize(event.quote.text)}`, lifted: lifted.has(event.seq) }];
+    if (kind === "corrections" && event.kind === "correction.add") return [{ kind, ref: event.id, span: event.span, text: `${event.id} [${event.quote.ordinal}] ${sanitize(event.quote.text)}`, lifted: lifted.has(eventKey(event)) }];
     return [];
   });
 }
@@ -102,7 +106,7 @@ function spanHits(deps: RecallDeps, span: number): RecallHit[] {
   const record = deps.log.spans.find((summary) => summary.span === span)?.record;
   const commands = (record ? record.ledger.commands.map((c) => ({ ...c, span })) : allCommands(deps).filter((c) => c.span === span)).map(commandHit);
   const errors = (record ? record.ledger.errors.map((e) => ({ ...e, span })) : allErrors(deps).filter((e) => e.span === span)).map(errorHit);
-  const lifted = liftedSeqs(deps.log.events);
+  const lifted = liftedKeys(deps);
   return [head, ...commands, ...errors, ...itemHits(events, "corrections", lifted), ...itemHits(events, "decisions", lifted), ...itemHits(events, "dead-ends", lifted)];
 }
 
@@ -117,7 +121,7 @@ function hitsFor(what: RecallWhat, deps: RecallDeps, query: string | undefined):
     case "span": return query && /^\d+$/.test(query) ? spanHits(deps, Number(query)) : spanHeads(deps);
     case "commands": return allCommands(deps).map(commandHit);
     case "errors": return allErrors(deps).map(errorHit);
-    case "decisions": case "dead-ends": case "corrections": return itemHits(deps.log.events, what, liftedSeqs(deps.log.events));
+    case "decisions": case "dead-ends": case "corrections": return itemHits(deps.log.events, what, liftedKeys(deps));
     case "message": {
       const text = query ? deps.messageText(query) : undefined;
       return text === undefined ? [] : [{ kind: "message", ref: query!, text: sanitize(text) }];

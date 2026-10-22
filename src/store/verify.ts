@@ -10,7 +10,7 @@ import { ownRuleOf, withoutReplacedWords } from "./lift-replacement.ts";
 import { liftNamesRule } from "./lift-words.ts";
 import type { Caps, Now, Provenance, Quote, Rejection, StateEvent } from "./events.ts";
 import { findNearDuplicate } from "./near-duplicate.ts";
-import { activeCorrections, activeDeadEnds, activeDecisions, applyEvent, type SessionState } from "./project.ts";
+import { activeCorrections, activeDeadEnds, activeDecisions, applyEvent, liftTarget, type SessionState } from "./project.ts";
 
 export type Proposal =
   | { kind: "objective"; ref?: string; text: string; doneWhen?: { ref?: string; text: string } }
@@ -110,10 +110,10 @@ function verifyQuoteKind(proposal: Extract<Proposal, { kind: "objective" | "done
       return stamp(ctx, undefined, { kind: "correction.add", id: `R${ctx.state.cursor.R + 1}`, quote: resolved.quote });
     }
     case "lift": {
-      // Newest holder of the id, as in project.ts: an old transcript can carry a reminted id (security.md T1). A target
+      // The rule the projection will lift (project.ts liftTarget): an old transcript can carry a reminted id. A target
       // written u<n> names the rule by the message that gave it: a rule labeled in this same pass has no id the model saw.
       const byOrdinal = /^u\d+$/.test(proposal.target);
-      const named = [...ctx.state.corrections].reverse().find((item) => (byOrdinal ? item.quote.ordinal === proposal.target && !item.retired : item.id === proposal.target));
+      const named = byOrdinal ? [...ctx.state.corrections].reverse().find((item) => item.quote.ordinal === proposal.target && !item.retired) : liftTarget(ctx.state.corrections, proposal.target);
       if (!named) return reject({ code: "unknown-target", target: proposal.target, known: activeCorrections(ctx.state).map((item) => item.id) });
       const target = named;
       if (target.liftedBy) {
