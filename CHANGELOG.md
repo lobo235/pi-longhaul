@@ -8,8 +8,34 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.0.3] - 2026-10-22
+
+### Changed
+
+- Tested with pi 1.3.0, now recorded in `pi-compat.json`. No code changes to the extension for it.
+
 ### Fixed
 
+- A span's record was lost whenever another extension wrote an entry between pi's compaction and Longhaul's span
+  record. pi-goal does this at every compaction (its `goal-state`, sometimes a `goal-contract` message), active
+  goal or not, so in a session with pi-goal installed most spans folded as narrative-less: the next state kept
+  only the span just closed, and every earlier span's work-log line, Now, decisions, dead ends, objective moves and
+  labelled rules were gone from it. The fold now passes over other extensions' entries until our record arrives; a
+  message, a compaction or one of Longhaul's own event entries arriving first still means the record never
+  landed. The records were always written, so an affected transcript gets its history back at its next
+  compaction. While its records were lost, each pass was shown earlier messages again and recorded their rules
+  again under new ids; with the records back, a rule recorded from the same message in near-duplicate words is
+  one rule, under its newest id, and a lift of any copy lifts it. A rule the user withdrew while its record was
+  lost could not be lifted then (the summarizer did not see it) and comes back now, so look over the
+  constraints the first state after the upgrade shows.
+- Spans whose records were written while earlier records were being lost can carry the same event seqs as an
+  earlier span (each pass numbered from a fold that had lost events). The fold now treats a seq as unique within
+  its span, so those spans fold too; a seq repeated inside one span is still refused as a duplicate. A correction
+  `longhaul_recall` shows as lifted is now the one the lift landed on, never another span's event with the same
+  seq.
+- A replayed event whose span or seq is not a whole number from 1 is refused as malformed. A seq of `1e999`
+  (Infinity) used to be accepted and broke the numbering of every event after it: a `longhaul_remember` write
+  was then stored without a seq and dropped, with no anomaly, when the transcript was read back.
 - The load smoke (`npm run load-smoke`, a development check that is not part of the package) resolved a
   wildcard `exports` target by replacing only its first `*`; it now replaces every one, as Node does (CodeQL
   `js/incomplete-sanitization`). No pi package uses a target with two, so the smoke's results are unchanged.
