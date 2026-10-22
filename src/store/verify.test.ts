@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { DEFAULT_CAPS, describeRejection, type Provenance } from "./events.ts";
-import { emptyState, project } from "./project.ts";
+import { applyEvent, emptyState, project } from "./project.ts";
 import { applyProposals, verify, type QuoteResolver, type VerifyContext } from "./verify.ts";
 import { closeEvent, ev, logOf, NOW, quote, resetSeq } from "./test-support.ts";
 
@@ -305,4 +305,22 @@ test("verify: a repeated lift aimed at a replacement by name never withdraws wha
     assert.equal(!repeated.ok && repeated.rejection.code, "lift-unnamed", name);
     if (replacement.includes("force-push")) assert.ok(verify({ kind: "lift", target: "u5", ref: "u11", text: "The force-push rule is lifted too." }, at).ok, `${name}: naming it lands`);
   }
+});
+
+test("verify: a lift is judged against the rule the projection then lifts, when an earlier copy of another rule held the id (security.md T2)", () => {
+  const messages: Array<[string, string]> = [["u1", "never force-push to the main branch"], ["u2", "use tabs for indentation everywhere"], ["u9", "The tabs rule is lifted."], ["u10", "The force-push rule is lifted."]];
+  const forcePush = quote("u1", "never force-push to the main branch");
+  const state = project(logOf(
+    ev({ kind: "correction.add", id: "R1", quote: forcePush }),
+    closeEvent(1),
+    ev({ kind: "correction.add", id: "R1", quote: quote("u2", "use tabs for indentation everywhere"), span: 2 }),
+    closeEvent(2),
+    ev({ kind: "correction.add", id: "R2", quote: forcePush, span: 3 }),
+  ), DEFAULT_CAPS);
+  const ctx = ctxWith({ resolver: fakeResolver(messages), state, provenance: { ...PROV, source: "diff", span: 3 } });
+  const tabs = verify({ kind: "lift", target: "R1", ref: "u9", text: "The tabs rule is lifted." }, ctx);
+  assert.ok(tabs.ok, "R1 is the tabs rule now");
+  assert.deepEqual(applyEvent(state, tabs.event, DEFAULT_CAPS).corrections.map((item) => [item.id, item.quote.ordinal, item.liftedBy?.ordinal]), [["R1", "u2", "u9"], ["R2", "u1", undefined]]);
+  const forcePushByOldId = verify({ kind: "lift", target: "R1", ref: "u10", text: "The force-push rule is lifted." }, ctx);
+  assert.ok(!forcePushByOldId.ok, "a lift naming the force-push rule's old id is judged against the tabs rule, and refused");
 });

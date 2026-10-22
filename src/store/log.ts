@@ -39,6 +39,7 @@ interface Fold {
   events: StateEvent[];
   spans: SpanSummary[];
   anomalies: FoldAnomaly[];
+  /** `span:seq` of every admitted event: a seq is unique within its span (see seqKey). */
   seqs: Set<string>;
   /** Loose events collected since the last compaction entry, keyed by nothing: in branch order. */
   loose: StateEvent[];
@@ -52,6 +53,15 @@ function quoteOf(event: StateEvent): Quote[] {
     case "goal.set": case "objective.doneWhen": case "correction.add": return [event.quote];
     default: return [];
   }
+}
+
+/**
+ * The duplicate key of an event: its seq within its span. A pass numbers from the fold it reads, and a fold that
+ * lost span records (another extension's entry ahead of one) numbered later spans from too low a seq, so two
+ * spans' records can share seqs; each span's events are still its own.
+ */
+function seqKey(event: { span: number; seq: number }): string {
+  return `${event.span}:${event.seq}`;
 }
 
 /** Admit one event into the fold, or record why not. */
@@ -73,7 +83,7 @@ function admit(fold: Fold, raw: unknown, span: number, entryId: string, checker:
     fold.anomalies.push({ span, entryId, reason: `event names span ${raw.span} while folding span ${span}: ${entryId}` });
     return;
   }
-  const key = String(raw.seq);
+  const key = seqKey(raw);
   if (fold.seqs.has(key)) {
     fold.anomalies.push({ span, entryId, reason: `duplicate seq: ${raw.seq} at ${entryId}` });
     return;
@@ -131,7 +141,7 @@ function takeRecord(fold: Fold, entry: Extract<SessionEntry, { type: "custom" }>
   }
   // The record SUPERSEDES the span's loose events, so release their seqs before admitting its own
   // (otherwise the record's authoritative copy of a loose event is dropped as a duplicate seq).
-  for (const loose of fold.loose) fold.seqs.delete(String(loose.seq));
+  for (const loose of fold.loose) fold.seqs.delete(seqKey(loose));
   const events: StateEvent[] = [];
   for (const raw of record.events) admit(fold, raw, pending.span, entry.id, checker, events);
   for (const event of events) fold.events.push(event);
@@ -140,13 +150,23 @@ function takeRecord(fold: Fold, entry: Extract<SessionEntry, { type: "custom" }>
   fold.pending = undefined;
 }
 
+/**
+ * Whether `entry` proves a pending compaction's span record never landed: a message, another compaction, or one
+ * of our own event entries. Anything else another extension wrote at session_compact (pi-goal's goal-state and
+ * goal-contract land there, ahead of the record) is passed over, so the record that follows still closes the span.
+ */
+function endsPendingSpan(entry: SessionEntry): boolean {
+  if (entry.type === "message" || entry.type === "compaction") return true;
+  return entry.type === "custom" && entry.customType === EVENT_ENTRY_TYPE;
+}
+
 export function readLog(branchEntries: SessionEntry[], checker: QuoteChecker): StateLog {
   const fold: Fold = { events: [], spans: [], anomalies: [], seqs: new Set(), loose: [] };
   let compactions = 0;
   for (const entry of branchEntries) {
-    // A pending state compaction is closed by its span record, which is the NEXT entry of interest;
-    // anything else arriving first means the record never landed.
-    if (fold.pending && !(entry.type === "custom" && entry.customType === SPAN_ENTRY_TYPE)) synthesizeClose(fold, undefined, entry.timestamp);
+    // A pending state compaction is closed by its span record, the next entry of OURS after it; a message,
+    // compaction or event arriving first means the record never landed.
+    if (fold.pending && endsPendingSpan(entry)) synthesizeClose(fold, undefined, entry.timestamp);
     if (entry.type === "compaction") {
       compactions++;
       const compactor = compactorOfEntry(entry);

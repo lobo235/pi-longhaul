@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { newestTranscript, parseArgs, runStateCli } from "./state-cli.ts";
 
-type Forge = { narrative?: string; fromRef?: string; toRef?: string; decision?: Record<string, unknown>; readFiles?: string[]; learnedValues?: Array<{ value: string; source: string }> };
+type Forge = { extra?: Array<Record<string, unknown>>; narrative?: string; fromRef?: string; toRef?: string; decision?: Record<string, unknown>; readFiles?: string[]; learnedValues?: Array<{ value: string; source: string }> };
 
 function transcript(name = "2026-09-28T10-00-00_abc.jsonl", forge: Forge = {}): { dir: string; file: string } {
   const dir = mkdtempSync(path.join(os.tmpdir(), "state-cli-"));
@@ -18,7 +18,7 @@ function transcript(name = "2026-09-28T10-00-00_abc.jsonl", forge: Forge = {}): 
     { type: "message", id: "m1", parentId: null, timestamp: "2026-09-28T10:00:01.000Z", message: { role: "user", content: "Build the state compactor and keep it small please", timestamp: 1 } },
     { type: "message", id: "a1", parentId: "m1", timestamp: "2026-09-28T10:00:02.000Z", message: { role: "assistant", content: [{ type: "text", text: "ok" }], api: "x", provider: "example", model: "model-a", stopReason: "stop", timestamp: 2, usage: {} } },
     { type: "compaction", id: "c1", parentId: "a1", timestamp: "2026-09-28T10:00:03.000Z", summary: "s", firstKeptEntryId: "a1", tokensBefore: 90500, fromHook: true, details: { compactor: "state", state: {}, caps: {}, ledger: { commands: [], errors: [] }, narrative: {}, readFiles: forge.readFiles ?? [], modifiedFiles: [], ...(forge.learnedValues ? { learnedValues: forge.learnedValues } : {}) } },
-    { type: "custom", id: "s1", parentId: "c1", timestamp: "2026-09-28T10:00:04.000Z", customType: "compaction-state.span", data: { v: 1, span: 1, compactionEntryId: "c1", events: forge.decision ? [objective, { ...forge.decision, seq: 2 }, { ...close, seq: 3 }] : [objective, close], ledger: { commands: [], errors: [] } } },
+    { type: "custom", id: "s1", parentId: "c1", timestamp: "2026-09-28T10:00:04.000Z", customType: "compaction-state.span", data: { v: 1, span: 1, compactionEntryId: "c1", events: forge.extra ? [objective, ...forge.extra.map((event, i) => ({ ...event, seq: i + 2 })), { ...close, seq: forge.extra.length + 2 }] : forge.decision ? [objective, { ...forge.decision, seq: 2 }, { ...close, seq: 3 }] : [objective, close], ledger: { commands: [], errors: [] } } },
   ];
   writeFileSync(file, lines.map((line) => JSON.stringify(line)).join("\n") + "\n");
   return { dir, file };
@@ -108,4 +108,12 @@ test("runStateCli: with no file and no --session-dir, it reads the sessions of p
   const out: string[] = [];
   assert.equal(runStateCli({ json: false, spans: true, anomalies: false }, (text) => out.push(text)), 0, out.join(""));
   assert.match(out.join(""), /span 1: entry c1/);
+});
+
+test("runStateCli --json: a rule's former ids print as a list, not as an empty object", () => {
+  const rule = { source: "pass", span: 1, at: "2026-09-28T10:00:03.000Z", kind: "correction.add", quote: { messageId: "m1", ordinal: "u1", text: "keep it small please" } };
+  const { file } = transcript(undefined, { extra: [{ ...rule, id: "R1" }, { ...rule, id: "R2" }] });
+  const json: string[] = [];
+  runStateCli({ file, json: true, spans: false, anomalies: false }, (text) => json.push(text));
+  assert.deepEqual(JSON.parse(json.join("")).corrections.map((item: { id: string; formerIds?: unknown }) => [item.id, item.formerIds]), [["R2", ["R1"]]]);
 });

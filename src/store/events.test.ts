@@ -43,3 +43,11 @@ test("isStateEvent: shape check used by the fold (table)", () => {
     assert.equal(isStateEvent(bad), false, JSON.stringify(bad));
   }
 });
+
+test("isStateEvent: seq and span are whole numbers a fold can count from (a replayed 1e999 parses as Infinity)", () => {
+  const body = { source: "remember", at: "2026-09-28T10:00:00.000Z", kind: "decision.add", id: "D1", text: "use fakes" };
+  assert.ok(isStateEvent({ ...body, span: 1, seq: 1 }));
+  for (const [name, provenance] of [["seq Infinity", { span: 1, seq: JSON.parse("1e999") }], ["seq fractional", { span: 1, seq: 1.5 }], ["seq NaN", { span: 1, seq: Number.NaN }], ["seq negative", { span: 1, seq: -1 }], ["seq past safe integers", { span: 1, seq: 2 ** 53 }], ["span Infinity", { span: JSON.parse("1e999"), seq: 1 }], ["span zero", { span: 0, seq: 1 }]] as const) {
+    assert.equal(isStateEvent({ ...body, ...provenance }), false, name);
+  }
+});

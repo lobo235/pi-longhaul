@@ -96,7 +96,8 @@ export function runStateCli(options: StateCliOptions, write: (text: string) => v
   if (options.spans) { write(`${stripControls(spanLines(context).join("\n"))}\n`); return 0; }
   if (options.anomalies) { write(context.log.anomalies.length ? `${stripControls(context.log.anomalies.map((anomaly) => JSON.stringify(anomaly)).join("\n"))}\n` : "no anomalies\n"); return 0; }
   const state = options.span === undefined ? project(context.log, config.caps) : projectAt(context.log, options.span, config.caps);
-  if (options.json) { write(`${JSON.stringify(state, null, 2)}\n`); return 0; }
+  // A Set (a rule's former ids) prints as its members; JSON.stringify alone gives {}.
+  if (options.json) { write(`${JSON.stringify(state, (_key, value: unknown) => (value instanceof Set ? [...value] : value), 2)}\n`); return 0; }
   write(`${render({ state, tokensBefore: tokensBeforeOf(branch, context, options.span), ledger: context.ledger, caps: config.caps, ...(options.span === undefined ? { files: context.files, learned: previousLearnedValues(branch) } : {}) })}\n`);
   return 0;
 }

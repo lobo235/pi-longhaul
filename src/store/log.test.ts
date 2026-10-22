@@ -113,6 +113,54 @@ test("readLog: a span record that names a different compaction entry than the on
   assert.match(log.anomalies[0].reason, /names compaction entry cX/);
 });
 
+test("readLog: another extension's entries between a compaction and its span record do not lose the record", () => {
+  // pi-goal appends its goal-state (and sometimes a goal-contract message) at session_compact, before Longhaul's
+  // span record lands: seen on 140 of 480 state compactions in real transcripts.
+  const r1 = ev({ kind: "correction.add", id: "R1", quote: quote("u2", "never use mocks anywhere"), source: "pass", span: 1 });
+  const contract = { ...customEntry("g2", "goal-contract", undefined), type: "custom_message", content: "Goal mode is inactive.", display: false } as unknown as SessionEntry;
+  const branch = chain([
+    compactionEntry("c1", { compactor: "state" }),
+    customEntry("g1", "goal-state", { goal: null }),
+    contract,
+    customEntry("s1", SPAN_ENTRY_TYPE, record(1, [r1, closeEvent(1)], "c1")),
+  ]);
+  const log = readLog(branch, checker);
+  assert.deepEqual(log.spans.map((span) => [span.span, span.record?.compactionEntryId]), [[1, "c1"]]);
+  assert.deepEqual(log.events.map((event) => event.kind), ["correction.add", "span.close"]);
+  assert.deepEqual(log.anomalies, []);
+});
+
+test("readLog: a message, a loose event or another compaction before the span record still means the record never landed", () => {
+  const loose = ev({ kind: "decision.add", id: "D1", text: "written in span 2", source: "remember", span: 2 });
+  for (const [name, boundary] of [["a message", userEntry("m-u2", "next turn")], ["a loose event", customEntry("e2", EVENT_ENTRY_TYPE, loose)], ["a compaction", compactionEntry("c2", { readFiles: [] }, false)]] as const) {
+    const branch = chain([compactionEntry("c1", { compactor: "state" }), customEntry("g1", "goal-state", {}), boundary, customEntry("s1", SPAN_ENTRY_TYPE, record(1, [closeEvent(1)], "c1"))]);
+    const log = readLog(branch, checker);
+    assert.equal(log.spans[0].record, undefined, `${name} closes the span without its record`);
+    assert.ok(log.anomalies.some((anomaly) => /no span record for compaction entry c1/.test(anomaly.reason)), name);
+  }
+});
+
+test("readLog: span records whose passes reused seqs (written while earlier records were being lost) all fold", () => {
+  // Before the fix above, a pass folded without the lost records and numbered its events from a lower seq,
+  // so two spans' records can carry the same seqs. Each span's events are its own; only a seq repeated
+  // INSIDE one span is a duplicate.
+  const d1 = ev({ kind: "decision.add", id: "D1", text: "first span's decision", source: "pass", span: 1 });
+  const close1 = closeEvent(1);
+  const d2 = { ...ev({ kind: "decision.add", id: "D2", text: "second span's decision", source: "pass", span: 2 }), seq: d1.seq };
+  const close2 = { ...closeEvent(2), seq: close1.seq };
+  const branch = chain([
+    compactionEntry("c1", { compactor: "state" }),
+    customEntry("g1", "goal-state", {}),
+    customEntry("s1", SPAN_ENTRY_TYPE, record(1, [d1, close1], "c1")),
+    compactionEntry("c2", { compactor: "state" }),
+    customEntry("s2", SPAN_ENTRY_TYPE, record(2, [d2, close2, { ...d2, id: "D3" } as StateEvent], "c2")),
+  ]);
+  const log = readLog(branch, checker);
+  assert.deepEqual(log.events.map((event) => (event as { id?: string }).id ?? `${event.kind}@${event.span}`), ["D1", "span.close@1", "D2", "span.close@2"]);
+  assert.deepEqual(log.anomalies.map((anomaly) => anomaly.reason), [`duplicate seq: ${d1.seq} at s2`]);
+  assert.ok(log.nextSeq > close1.seq);
+});
+
 test("compactorOfEntry / spanNumberOf / isSpanRecord", () => {
   assert.equal(compactorOfEntry({}), "pi");
   assert.equal(compactorOfEntry({ fromHook: true }), "extension");
