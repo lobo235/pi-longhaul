@@ -8,6 +8,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.0.4] - 2026-10-22
+
 ### Fixed
 
 - The summarizer copied credentials into the state it wrote: a password from a script's output into Resume, an API
