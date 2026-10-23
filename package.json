@@ -32,7 +32,7 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.0.4/.github/assets/infographic.png"
+    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.1.0/.github/assets/infographic.png"
   },
   "files": [
     "src/**/*.ts",
