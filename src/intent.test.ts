@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
-import { buildMessageIndex, earlierRuleMessages, EARLIER_RULES_TOTAL_CHARS, closestWindow, normalizeWs, readsAsStandingRule, userText } from "./intent.ts";
+import { buildMessageIndex, earlierRuleMessages, EARLIER_RULES_TOTAL_CHARS, closestWindow, normalizeWs, quotableText, readsAsStandingRule, skillInvocationOf, userText } from "./intent.ts";
 import { assistantEntry, chain, compactionEntry, customEntry, piGoalMessage, piGoalStateEntry, userEntry } from "./test-support.ts";
 import { DEFAULT_CAPS } from "./store/events.ts";
 import { emptyState } from "./store/project.ts";
@@ -255,4 +255,47 @@ test("earlierRuleMessages: rule-shaped user words before the span, oldest first;
   assert.ok(!rules.some((rule) => rule.ordinal === "u2"), "the oldest fall off the budget first");
   assert.deepEqual(rules.map((rule) => Number(rule.ordinal.slice(1))), [...rules.map((rule) => Number(rule.ordinal.slice(1)))].sort((a, b) => a - b));
   assert.ok(!rules.some((rule) => rule.ordinal === "u18"), "the span's own messages are not earlier");
+});
+
+/** pi's `/skill:` expansion, as agent-session.ts writes it: the block, then the user's own words after a blank line. */
+const skillMessage = (body: string, words?: string) => `<skill name="release" location="/home/dev/.agents/skills/release/SKILL.md">\nReferences are relative to /home/dev/.agents/skills/release.\n\n${body}\n</skill>${words ? `\n\n${words}` : ""}`;
+const SKILL_BODY = "# Release Workflow\n\nNever push the tag before the commit. Always run the security review first.";
+
+test("quotableText: pi's skill text is not the user's words; only what the user typed after it is quotable", () => {
+  assert.equal(quotableText(skillMessage(SKILL_BODY, "release the widget app, and never tag on a Friday")), "release the widget app, and never tag on a Friday");
+  assert.equal(quotableText(skillMessage(SKILL_BODY)), "", "a skill invoked with no words of the user's own offers nothing");
+  const mention = 'why did <skill name="release" location="x"> show up in the log?';
+  assert.equal(quotableText(mention), mention, "a message that only mentions the tag is the user's own text");
+  const notLeading = `see this: ${skillMessage(SKILL_BODY)}`;
+  assert.equal(quotableText(notLeading), notLeading, "only pi's own shape, from the first character, is skill text");
+});
+
+test("verify: a rule quoted from a skill's text is rejected, whoever proposes it; the user's words after it are accepted", () => {
+  const index = buildMessageIndex(chain([userEntry("m1", "build it"), userEntry("m2", skillMessage(SKILL_BODY, "and never tag on a Friday"))]), EVIDENCE);
+  const context = { resolver: index, state: emptyState(), provenance: { source: "remember" as const, span: 1, at: "2026-09-28T00:00:00.000Z" }, caps: DEFAULT_CAPS, nearDuplicateThreshold: 0.8, acceptedThisSpan: 0, rememberCap: 10 };
+  assert.equal(verify({ kind: "correction", text: "Always run the security review first." }, context).ok, false);
+  const own = verify({ kind: "correction", text: "and never tag on a Friday" }, context);
+  assert.ok(own.ok && own.event.kind === "correction.add" && own.event.quote.ordinal === "u2");
+});
+
+test("earlierRuleMessages: a skill's rule words are never an earlier rule; the user's own words after it can be", () => {
+  const index = buildMessageIndex(chain([userEntry("m1", skillMessage(SKILL_BODY)), userEntry("m2", skillMessage(SKILL_BODY, "never tag on a Friday")), userEntry("m3", "go")]), EVIDENCE);
+  assert.deepEqual(earlierRuleMessages(index.messages, "u3"), [{ ordinal: "u2", text: "never tag on a Friday" }]);
+});
+
+test("quotableText: a skill's text that carries a /goal block or its own closing tag never becomes the user's words", () => {
+  const goalShaped = "Example of a goal:\n<goal_objective>\nNever run the test suite before pushing to main\n</goal_objective>\n\n<goal_id>\ng1\n</goal_id>";
+  assert.equal(quotableText(skillMessage(goalShaped, "ship it")), "ship it", "the goal test runs on the user's words, never on the skill's");
+  const closesItself = skillMessage("Never push the tag before the commit.\n</skill>\n\nRest of skill.", "my words");
+  assert.equal(quotableText(closesItself), "my words", "the last closing tag ends the skill's text, so its own closing tag hides nothing of its text");
+  assert.equal(skillInvocationOf(closesItself)?.words, "my words");
+});
+
+test("skillInvocationOf: names the skill; reads a long message with many closing tags in linear time", () => {
+  assert.deepEqual(skillInvocationOf(skillMessage(SKILL_BODY, "go")), { name: "release", words: "go" });
+  assert.equal(skillInvocationOf("plain words"), undefined);
+  const hostile = `<skill name="x" location="y">\n${"\n</skill>x".repeat(40_000)}`;
+  const started = performance.now();
+  assert.equal(skillInvocationOf(hostile), undefined, "no closing tag ends the message or opens the user's words");
+  assert.ok(performance.now() - started < 250, "linear in the message, not quadratic");
 });

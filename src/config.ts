@@ -69,7 +69,7 @@ export function readConfigFile(agentDir: string = getAgentDir()): string | undef
   }
 }
 
-const CAP_FLOORS: Record<keyof Caps, number> = { hardChars: 2000, objectiveQuoteChars: 40, corrections: 1, correctionChars: 40, decisions: 1, deadEnds: 1, itemChars: 40, workLogLines: 1, openErrors: 0, worldChars: 200, filesChars: 0, learnedChars: 0 };
+const CAP_FLOORS: Record<keyof Caps, number> = { hardChars: 2000, objectiveQuoteChars: 40, corrections: 0, correctionChars: 40, decisions: 1, deadEnds: 1, itemChars: 40, workLogLines: 1, openErrors: 0, worldChars: 200, filesChars: 0, learnedChars: 0 };
 const CLAIM_KINDS: ReadonlySet<string> = new Set<ClaimKind>(["test", "build", "lint", "custom"]);
 
 function parseObject(raw: string | undefined): Record<string, unknown> {

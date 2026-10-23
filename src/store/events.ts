@@ -80,6 +80,7 @@ export const closedWhole = (close: { foreign?: unknown; narrativeLess: boolean; 
 export interface Caps {
   hardChars: number;
   objectiveQuoteChars: number;
+  /** The most active corrections kept, the oldest retiring past it; 0 (the default) keeps every one until it is lifted, up to CORRECTIONS_CEILING. */
   corrections: number;
   correctionChars: number;
   decisions: number;
@@ -95,7 +96,14 @@ export interface Caps {
   learnedChars: number;
 }
 
-export const DEFAULT_CAPS: Caps = { hardChars: 13500, objectiveQuoteChars: 600, corrections: 8, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 300, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 };
+/**
+ * With no count cap set, the most active corrections a state keeps: a safety bound, never a working limit (the most a
+ * real session carried was 22). Past it the oldest retires, still recallable from the transcript, so text steered into
+ * many rules cannot grow the state, and every summarizer prompt, without end (security.md T4).
+ */
+export const CORRECTIONS_CEILING = 64;
+
+export const DEFAULT_CAPS: Caps = { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 300, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 };
 
 export const MIN_QUOTE_CHARS = 12;
 

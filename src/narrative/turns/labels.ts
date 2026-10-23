@@ -8,8 +8,8 @@
  * forced label per earlier message made "not a rule" the cheap answer and dropped half the earlier
  * rules in a replay; opt-out keeps the default safe.
  */
-import { SPAN_EXCERPT_CHARS, spanExcerpt as excerpt } from "../prepare.ts";
-import { LABEL_FORMS, LIFT_GUIDANCE, labelProposals, RULE_DEFINITION, ruleLabelProblem, readLabels, RULE_WHOLE_CHARS, type Label } from "../message-labels.ts";
+import { listedExcerpt, SPAN_EXCERPT_CHARS, spanExcerpt as excerpt } from "../prepare.ts";
+import { EARLIER_REQUEST, LABEL_FORMS, LIFT_GUIDANCE, labelProposals, NOT_A_RULE, RULE_DEFINITION, ruleLabelProblem, readLabels, RULE_WHOLE_CHARS, type Label } from "../message-labels.ts";
 import type { Proposal } from "../../store/verify.ts";
 import type { Complaint, Facts, Parsed, Section } from "./section.ts";
 
@@ -22,19 +22,19 @@ export { RULE_WHOLE_CHARS };
 const shownOf = (facts: Facts) => (ordinal: string): number | undefined => (facts.contextOrdinals?.includes(ordinal) ? SPAN_EXCERPT_CHARS : undefined);
 
 function instruction(facts: Facts): string {
-  const span = facts.spanOrdinals.map((ordinal) => `${ordinal}: ${excerpt(facts.textOf(ordinal) ?? "")}`);
-  const seed = facts.seedOrdinals.map((ordinal) => `${ordinal}: ${excerpt(facts.textOf(ordinal) ?? "")}`);
-  const context = (facts.contextOrdinals ?? []).map((ordinal) => `${ordinal}: ${excerpt(facts.textOf(ordinal) ?? "")}`);
+  const span = facts.spanOrdinals.map((ordinal) => `${ordinal}: ${listedExcerpt(facts.textOf(ordinal) ?? "")}`);
+  const seed = facts.seedOrdinals.map((ordinal) => `${ordinal}: ${listedExcerpt(facts.textOf(ordinal) ?? "")}`);
+  const context = (facts.contextOrdinals ?? []).map((ordinal) => `${ordinal}: ${listedExcerpt(facts.textOf(ordinal) ?? "")}`);
   const rules = facts.activeCorrections.map((rule) => `${rule.id} [${rule.ordinal}] ${excerpt(rule.text)}`);
   return [
     "Section 3 of 5: the user's messages. Label EVERY message listed under Messages in this span with one of:",
-    `${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} "not a rule" is a request, question, answer, approval or one-off.`,
+    `${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} ${NOT_A_RULE}`,
     `Code copies the user's words. A message longer than ${RULE_WHOLE_CHARS} characters that you label a rule must come with the rule's exact words instead of "rule": {"u7": {"rule": "<the user's exact words>"}}.`,
     'Answer: {"labels": {"u3": "not a rule", "u4": "rule", "u5": "lifts R1"}}',
     `Standing rules already recorded:\n${rules.length ? rules.join("\n") : "(none)"}`,
     `Messages in this span:\n${span.length ? span.join("\n") : "(none)"}`,
     ...(seed.length ? [`Earlier messages that read like standing rules. Each one is kept as a rule automatically; do not label them. Only if one was a one-off request, an answer or a question rather than a rule still in force, list its id in a top-level "oneOffs" array, e.g. "oneOffs": ["u3"]; list none when all of them still hold:\n${seed.join("\n")}`] : []),
-    ...(context.length ? [`The user's other earlier messages, each cut to its start. Label every one of these too: "rule" when it is a standing rule still in force, however it is worded ("tests go under tests/", "our servers run Node 22"), "not a rule" otherwise:\n${context.join("\n")}`] : []),
+    ...(context.length ? [`The user's other earlier messages, each cut to its start. Label every one of these too: "rule" when it is a standing rule still in force, however it is worded ("tests go under tests/", "our servers run Node 22"), "not a rule" otherwise. ${EARLIER_REQUEST}\n${context.join("\n")}`] : []),
   ].join("\n\n");
 }
 

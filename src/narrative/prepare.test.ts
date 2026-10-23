@@ -53,6 +53,17 @@ test("prepareSpan: a /goal-mode message is listed by its objective, not by pi's 
   assert.deepEqual(span.ordinals.map(({ ordinal, excerpt }) => ({ ordinal, excerpt })), [{ ordinal: "u1", excerpt: "[/goal] ship the scorer fixes" }]);
 });
 
+test("prepareSpan: a skill invocation is listed by the skill's name and the user's own words, never by the skill's text", () => {
+  const skill = (words?: string) => `<skill name="release" location="/skills/release/SKILL.md">\nReferences are relative to /skills/release.\n\n# Release\n\nNever push the tag first.\n</skill>${words ? `\n\n${words}` : ""}`;
+  const entries = chain([userEntry("m1", skill("release the widget app")), assistantEntry("a1", "on it"), userEntry("m2", skill()), assistantEntry("a2", "ok")]);
+  const messages = entries.map((entry) => (entry as unknown as { message: AgentMessage }).message);
+  const span = prepareSpan({ messagesToSummarize: messages, turnPrefixMessages: [], index: buildMessageIndex(entries, EVIDENCE) });
+  assert.deepEqual(span.ordinals.map(({ ordinal, excerpt }) => ({ ordinal, excerpt })), [
+    { ordinal: "u1", excerpt: "[/skill:release] release the widget app" },
+    { ordinal: "u2", excerpt: "[/skill:release] (no words of the user's own)" },
+  ]);
+});
+
 test("prepareSpan: a message is listed whole up to 240 characters, and a longer one ends in an ellipsis where it is cut", () => {
   const short = `Keep the type hints for the ledger package itself; ${"the test files may skip them. ".repeat(5)}`.trim();
   const long = `The type hint rule is lifted for test files, but keep it for the ledger package itself. ${"Then rerun the suite and paste the summary. ".repeat(6)}`.trim();

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { DEFAULT_NARRATIVE_POLICY, resolveNarrativePolicy } from "./policy.ts";
-import { checkNarrativeDiff } from "./types.ts";
+import { checkNarrativeDiff, LIST_ITEMS } from "./types.ts";
 
 const good = { narrative: "did x", corrections: [{ messageRef: "u2", text: "never use mocks in these tests" }], lifts: [], decisions: [{ text: "copy the ledger", evidence: "C1" }], deadEnds: [], now: { inProgress: ["a"], next: [], blocked: [], resume: "run npm test" } };
 
@@ -62,5 +62,20 @@ test("checkNarrativeDiff: the Now arrays and items are bounded at the schema (se
     const value = checkNarrativeDiff({ ...good, now: { ...good.now, [key]: at(40) } });
     assert.ok(!value.ok, key);
     assert.match(value.errors.join("; "), new RegExp(`/now/${key}`));
+  }
+});
+
+test("checkNarrativeDiff: the rule, lift, decision and dead-end lists are bounded at the schema (security.md T2)", () => {
+  const many = <T>(n: number, item: (i: number) => T) => Array.from({ length: n }, (_, i) => item(i));
+  const lists = {
+    corrections: (i: number) => ({ messageRef: `u${i + 1}`, text: `never do thing ${i}` }),
+    lifts: (i: number) => ({ target: `R${i + 1}`, messageRef: "u40", text: "forget that" }),
+    decisions: (i: number) => ({ text: `decided ${i}` }),
+    deadEnds: (i: number) => ({ text: `tried ${i}` }),
+  };
+  for (const [key, item] of Object.entries(lists)) {
+    assert.equal(checkNarrativeDiff({ ...good, [key]: many(LIST_ITEMS, item) }).ok, true, `${key}: ${LIST_ITEMS} fit`);
+    const over = checkNarrativeDiff({ ...good, [key]: many(LIST_ITEMS + 1, item) });
+    assert.ok(!over.ok && over.errors.some((error) => error.startsWith(`/${key}`)), `${key}: one more is refused`);
   }
 });

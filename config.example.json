@@ -3,7 +3,7 @@
   "routeProviders": [],
   "localOnlyRoots": [],
   "summarizerHeaders": {},
-  "caps": { "hardChars": 13500, "objectiveQuoteChars": 600, "corrections": 8, "correctionChars": 300, "decisions": 10, "deadEnds": 10, "itemChars": 300, "workLogLines": 12, "openErrors": 5, "worldChars": 1200, "filesChars": 2500, "learnedChars": 1500 },
+  "caps": { "hardChars": 13500, "objectiveQuoteChars": 600, "corrections": 0, "correctionChars": 300, "decisions": 10, "deadEnds": 10, "itemChars": 300, "workLogLines": 12, "openErrors": 5, "worldChars": 1200, "filesChars": 2500, "learnedChars": 1500 },
   "claimPatterns": [
     { "pattern": "npm test", "kind": "test" }, { "pattern": "node --test", "kind": "test" }, { "pattern": "go test", "kind": "test" },
     { "pattern": "pytest", "kind": "test" }, { "pattern": "cargo test", "kind": "test" }, { "pattern": "make test", "kind": "test" },

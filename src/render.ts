@@ -105,8 +105,12 @@ function retiredNote(count: number, what?: string): string {
   return what ? `; ${count} retired, ${RECALL_TOOL} ${what}` : `; ${count} retired`;
 }
 
+/** How much of a rule the cap fit condensed is shown (capfit.ts); the cut names the message that holds it whole. */
+export const CONDENSED_CORRECTION_CHARS = 80;
+
 function correctionsSection({ state, caps }: RenderInput): string[] {
-  const lines = activeCorrections(state).map((item) => `- ${item.id} [${item.quote.ordinal}] ${renderQuote(item.quote, caps.correctionChars)}${item.liftedBy ? ` (lifted by ${item.liftedBy.ordinal})` : ""}`);
+  const shown = (condensed: boolean | undefined) => (condensed ? Math.min(CONDENSED_CORRECTION_CHARS, caps.correctionChars) : caps.correctionChars);
+  const lines = activeCorrections(state).map((item) => `- ${item.id} [${item.quote.ordinal}] ${renderQuote(item.quote, shown(item.condensed))}${item.liftedBy ? ` (lifted by ${item.liftedBy.ordinal})` : ""}`);
   return [`## Constraints & corrections (verbatim, newest last${retiredNote(state.retired.corrections, "corrections")})`, ...(lines.length ? lines : ["(none)"])];
 }
 

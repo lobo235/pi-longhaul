@@ -7,11 +7,19 @@ import { DEFAULT_CAPS } from "../store/events.ts";
 import { project } from "../store/project.ts";
 import { closeEvent, ev, logOf, quote, resetSeq } from "../store/test-support.ts";
 import { fixedPromptChars, NARRATIVE_PROMPT_REVISION, NARRATIVE_SYSTEM_PROMPT, planChunks, promptStateOf, renderNarrativePrompt, SEED_HEAD_CHARS, SEED_TAIL_CHARS, seedOf } from "./prompt.ts";
+import { EARLIER_REQUEST, NOT_A_RULE, RULE_DEFINITION } from "./message-labels.ts";
 
 test.beforeEach(() => resetSeq());
 
 const user = (text: string, ts: number) => ({ role: "user", content: text, timestamp: ts }) as AgentMessage;
 const assistant = (text: string, ts: number) => ({ role: "assistant", content: [{ type: "text", text }], api: "x", provider: "x", model: "x", stopReason: "stop", timestamp: ts, usage: {} }) as unknown as AgentMessage;
+
+test("promptStateOf: each rule's text is cut to the quote cap, naming its recall, so the summarizer prompt stays bounded", () => {
+  const long = `never ${"touch the vendored tree ".repeat(60)}`;
+  const state = promptStateOf(project(logOf(ev({ kind: "correction.add", id: "R1", quote: quote("u2", long) })), DEFAULT_CAPS), [], 600);
+  assert.ok(state.corrections[0].text.length <= 640);
+  assert.match(state.corrections[0].text, /… \(longhaul_recall message u2\)$/);
+});
 
 test("promptStateOf: hot items with ids and ordinals; remembered events of this span listed by kind", () => {
   const log = logOf(
@@ -76,7 +84,7 @@ test("renderNarrativePrompt: system prompt first (cacheable), then state, ordina
   assert.ok(text.trimEnd().endsWith("</retry-note>"));
   assert.match(NARRATIVE_SYSTEM_PROMPT, /```json/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /"messageRef"/);
-  assert.equal(NARRATIVE_PROMPT_REVISION, "state-17");
+  assert.equal(NARRATIVE_PROMPT_REVISION, "state-19");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: every user message of the span is labeled, in every form the parser reads, whatever words it uses", () => {
@@ -147,6 +155,13 @@ test("renderNarrativePrompt: the earlier rules say the code records them and tha
   assert.match(text, /need no label unless one replaces or withdraws an earlier rule: label that one "rule and lifts u<n>" or "lifts u<n>"/, "a listed message that replaces a rule still lifts it");
 });
 
+test("renderNarrativePrompt: the other earlier messages say an earlier request is not a rule, however it says the result must behave", () => {
+  const state = { corrections: [], decisions: [], deadEnds: [], remembered: [], seed: "## Goal\nship it", seedRules: [], seedContext: [{ ordinal: "u2", text: "add an export button" }] };
+  const text = renderNarrativePrompt({ state, ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
+  assert.ok(text.includes(EARLIER_REQUEST), "the switchover's boundary for earlier requests");
+  assert.ok(text.indexOf(EARLIER_REQUEST) < text.indexOf("<earlier-other-messages>"));
+});
+
 test("NARRATIVE_SYSTEM_PROMPT: a file-name format the user chose is a value, placeholders and all", () => {
   assert.match(NARRATIVE_SYSTEM_PROMPT, /a file-name format the user chose \("<name>-YYYYMMDD\.tar\.gz"\)/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /with <placeholders> if the format has them/);
@@ -156,4 +171,9 @@ test("promptStateOf: a remembered decision with a credential in it reaches the s
   const log = logOf(ev({ kind: "decision.add", id: "D1", text: "call it with Bearer 3f7a2c91-5b4e-4d8a-9c1f-7e6b2a0d4c58", source: "remember" }));
   const state = promptStateOf(project(log, DEFAULT_CAPS), log.events);
   assert.deepEqual(state.remembered, [{ kind: "decision", text: "D1 call it with Bearer <redacted>" }]);
+});
+
+test("renderNarrativePrompt: the single call says what a rule is and is not in the words both modes share", () => {
+  const text = renderNarrativePrompt({ state: promptStateOf(project(logOf(), DEFAULT_CAPS), []), ordinals: [], conversation: "", chunk: { index: 1, total: 1 } });
+  assert.ok(text.includes(RULE_DEFINITION) && text.includes(NOT_A_RULE));
 });

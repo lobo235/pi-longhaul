@@ -7,6 +7,7 @@ import { emptyState, type SessionState } from "../../store/project.ts";
 import type { VerifyContext } from "../../store/verify.ts";
 import { chain, userEntry } from "../../test-support.ts";
 import { labelsSection, RULE_WHOLE_CHARS } from "./labels.ts";
+import { EARLIER_REQUEST, NOT_A_RULE, RULE_DEFINITION } from "../message-labels.ts";
 import { judgeAnswer, type Facts } from "./section.ts";
 
 const long = `Here is the log you asked for.\n${"line of output\n".repeat(60)}And from now on never run the e2e suite locally.`;
@@ -94,6 +95,7 @@ test("labels: a label that is none of the three is a complaint naming the messag
 test("labels: on a switchover the user's other earlier messages are listed and must be labeled; one labeled a rule is recorded", () => {
   const f = facts({ spanOrdinals: ["u4"], contextOrdinals: ["u2"] });
   assert.match(labelsSection.instruction(f), /Label every one of these too[^]*u2: please fix the flaky test/);
+  assert.ok(labelsSection.instruction(f).includes(EARLIER_REQUEST), "an earlier request is not a rule, in turns mode too");
   const unlabeled = judgeAnswer(labelsSection, answer({ u4: "not a rule" }), f, ctx());
   assert.deepEqual(unlabeled.complaints.map((complaint) => [complaint.check, complaint.message]), [["labels.unlabelled", "label every listed message; missing: u2"]]);
   const labeled = judgeAnswer(labelsSection, answer({ u2: "rule", u4: "not a rule" }), f, ctx());
@@ -108,4 +110,18 @@ test("labels: an earlier message listed cut to its start needs the rule's exact 
   const judged = judgeAnswer(labelsSection, answer({ u2: "rule", u4: "not a rule" }), f, ctx());
   assert.deepEqual(judged.complaints.map((complaint) => complaint.check), ["labels.rule-words"]);
   assert.match(judged.complaints[0].message, /u2 was shown cut to its first 240 characters/);
+});
+
+test("labelsSection: the turns prompt says what a rule is and is not in the single call's own words", () => {
+  const text = labelsSection.instruction(facts());
+  assert.ok(text.includes(RULE_DEFINITION) && text.includes(NOT_A_RULE));
+  assert.match(NOT_A_RULE, /a request for the work at hand, however firmly it is worded/);
+  assert.match(RULE_DEFINITION, /still binds once the work asked for now is done/);
+});
+
+test("labels: a skill invocation is listed by the skill's name and the user's own words, never by the skill's text", () => {
+  const invoked = '<skill name="release" location="/skills/release/SKILL.md">\nReferences are relative to /skills/release.\n\n# Release\n\nNever push the tag first.\n</skill>\n\nrelease the widget app';
+  const text = labelsSection.instruction(facts({ spanOrdinals: ["u2"], textOf: (ordinal) => (ordinal === "u2" ? invoked : index.textOf(ordinal)) }));
+  assert.ok(text.includes("u2: [/skill:release] release the widget app"));
+  assert.ok(!text.includes("Never push the tag first"));
 });

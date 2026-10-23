@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { DEFAULT_CAPS, describeRejection, isStateEvent, MIN_QUOTE_CHARS, type Rejection, type StateEvent } from "./events.ts";
 
 test("DEFAULT_CAPS are the documented defaults", () => {
-  assert.deepEqual(DEFAULT_CAPS, { hardChars: 13500, objectiveQuoteChars: 600, corrections: 8, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 300, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 });
+  assert.deepEqual(DEFAULT_CAPS, { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 300, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 });
   assert.equal(MIN_QUOTE_CHARS, 12);
 });
 

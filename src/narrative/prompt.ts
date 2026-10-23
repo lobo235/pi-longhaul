@@ -12,7 +12,7 @@ import { quoteText } from "../render.ts";
 import { DEFAULT_CAPS, type Now, type Quote, type StateEvent } from "../store/events.ts";
 import { activeCorrections, activeDeadEnds, activeDecisions, GOAL_SOURCE_LABEL, goalLine, type GoalSource, type SessionState } from "../store/project.ts";
 import { fitFirstChunk } from "./fit.ts";
-import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from "./message-labels.ts";
+import { EARLIER_REQUEST, LABEL_FORMS, LIFT_GUIDANCE, NOT_A_RULE, RULE_DEFINITION, RULE_WHOLE_CHARS } from "./message-labels.ts";
 
 /**
  * state-2: the switchover seed (previous summary + the user's earlier rule-shaped messages) and /goal excerpts in the user-message index.
@@ -35,8 +35,11 @@ import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from ".
  *   (the seed floor now records "from now on" replacements, which "they need no label" left lifting nothing).
  * state-16: outside a /goal, the session's opening request is the goal line once the Request has moved from it
  *   (store/project.ts goalLine), so the project's purpose survives every compaction; never quoted as the objective.
+ * state-18: a rule is what still binds once the work asked for now is done; "not a rule" names the kinds that filled
+ *   rule slots on real sessions (a firm request for the task at hand, a question, a report, an idea under discussion).
+ * state-19: at a switchover, an earlier request is not a rule even when it says how the result must behave.
  */
-export const NARRATIVE_PROMPT_REVISION = "state-17";
+export const NARRATIVE_PROMPT_REVISION = "state-19";
 
 export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a coding session that is being compacted. You are given the state so far, the user's messages with their ordinals (u1, u2, ...), and the conversation being compacted. Answer with ONE fenced json block and nothing else:
 
@@ -53,7 +56,7 @@ export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a codi
 }
 \`\`\`
 
-Rules. "objective" is the request the work is answering now. It is optional: include it only when none is set or the user moved to a different request in this span, and quote the user's own message verbatim. The goal line, when present, is the active /goal or the session's opening request: code keeps it, so never quote it as the objective; under a goal the objective is the specific ask. "labels": Label EVERY message in <user-messages> with one of ${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} The target is R<n> from the state, or u<n> for a rule given earlier in this span. "not a rule" is a request, question, answer, approval or one-off. Code copies the user's words into the state, so a short message labeled a rule needs no quote; a message longer than ${RULE_WHOLE_CHARS} characters labeled a rule must come with the rule's exact words: {"u7": {"rule": "<exact words>"}}. "corrections" is only for a standing rule that an earlier summary records and no listed message gives; quote the user's exact words. "values": values a later turn may need again that no file will give back: a measurement, a total, a port or a count a turn reported, a hash it named, a file-name format the user chose ("<name>-YYYYMMDD.tar.gz"). Copy each exactly as it appears in the turn "ref" names (the user's message, your replies and the tool output up to the next user message); a value is a number with or without its unit ("166 ms"), a version, a short commit hash, a path or file name (with <placeholders> if the format has them), a host:port or a date; nothing else is kept. "name" is a short label (at most 40 characters, no colon) saying what it is. At most 12, never a password, key or token. "decisions" and "deadEnds" are your own one-sentence records with evidence: a command id C<n>, an error id E<n>, a message u<n>, or the words "last command" / "last error". "now" replaces the previous Now entirely. Never write "done" unless the state's Done gate line says met. ${CREDENTIAL_RULE} Empty arrays are fine. No prose outside the fence.`;
+Rules. "objective" is the request the work is answering now. It is optional: include it only when none is set or the user moved to a different request in this span, and quote the user's own message verbatim. The goal line, when present, is the active /goal or the session's opening request: code keeps it, so never quote it as the objective; under a goal the objective is the specific ask. "labels": Label EVERY message in <user-messages> with one of ${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} The target is R<n> from the state, or u<n> for a rule given earlier in this span. ${NOT_A_RULE} Code copies the user's words into the state, so a short message labeled a rule needs no quote; a message longer than ${RULE_WHOLE_CHARS} characters labeled a rule must come with the rule's exact words: {"u7": {"rule": "<exact words>"}}. "corrections" is only for a standing rule that an earlier summary records and no listed message gives; quote the user's exact words. "values": values a later turn may need again that no file will give back: a measurement, a total, a port or a count a turn reported, a hash it named, a file-name format the user chose ("<name>-YYYYMMDD.tar.gz"). Copy each exactly as it appears in the turn "ref" names (the user's message, your replies and the tool output up to the next user message); a value is a number with or without its unit ("166 ms"), a version, a short commit hash, a path or file name (with <placeholders> if the format has them), a host:port or a date; nothing else is kept. "name" is a short label (at most 40 characters, no colon) saying what it is. At most 12, never a password, key or token. "decisions" and "deadEnds" are your own one-sentence records with evidence: a command id C<n>, an error id E<n>, a message u<n>, or the words "last command" / "last error". "now" replaces the previous Now entirely. Never write "done" unless the state's Done gate line says met. ${CREDENTIAL_RULE} Empty arrays are fine. No prose outside the fence.`;
 
 export interface PromptState {
   /** The Goal line (store/project.ts goalLine), shown so the summarizer never re-picks it as the Request. */
@@ -89,7 +92,7 @@ export function seedOf(previousSummary: string | undefined): string | undefined 
 
 const SEED_RULES_GUIDANCE = 'The user\'s own earlier messages that read like standing rules, verbatim, with their ordinals. Each one is recorded as corrections automatically, word for word: do not copy them into "corrections", and they need no label unless one replaces or withdraws an earlier rule: label that one "rule and lifts u<n>" or "lifts u<n>". List the ordinal of any that was a one-off request, an answer or a question rather than a rule still in force in a top-level "oneOffs" array, e.g. "oneOffs": ["u3"]; list none when all of them still hold. A rule a later message withdrew or replaced is not in force either: label that later message "lifts u<n>" (or "rule and lifts u<n>"), whether it is listed here or among the other messages.';
 
-const SEED_CONTEXT_GUIDANCE = 'The user\'s other earlier messages, each cut to its start. A later message may withdraw or replace an earlier rule: label it "lifts u<n>" (or "rule and lifts u<n>") with the earlier rule\'s ordinal, and that rule is not carried. Label every one of these too: "rule" when it is a standing rule still in force, however it is worded ("tests go under tests/", "our servers run Node 22"), "not a rule" otherwise.';
+const SEED_CONTEXT_GUIDANCE = `The user's other earlier messages, each cut to its start. A later message may withdraw or replace an earlier rule: label it "lifts u<n>" (or "rule and lifts u<n>") with the earlier rule\'s ordinal, and that rule is not carried. Label every one of these too: "rule" when it is a standing rule still in force, however it is worded ("tests go under tests/", "our servers run Node 22"), "not a rule" otherwise. ${EARLIER_REQUEST}`;
 
 export const SEED_CONTEXT_EXCERPT_CHARS = 240;
 
@@ -136,7 +139,7 @@ export function promptStateOf(state: SessionState, remembered: StateEvent[], quo
   return {
     ...goalOf(state, quoteChars),
     objective: state.objective ? { ...cut(state.objective.quote), doneWhen: state.objective.doneWhen ? cut(state.objective.doneWhen) : undefined } : undefined,
-    corrections: activeCorrections(state).map((item) => ({ id: item.id, ordinal: item.quote.ordinal, text: item.quote.text, lifted: item.liftedBy?.ordinal })),
+    corrections: activeCorrections(state).map((item) => ({ id: item.id, ordinal: item.quote.ordinal, text: quoteText(item.quote, quoteChars), lifted: item.liftedBy?.ordinal })),
     decisions: activeDecisions(state).map((item) => ({ id: item.id, text: item.text })),
     deadEnds: activeDeadEnds(state).map((item) => ({ id: item.id, text: item.text })),
     now: state.now ? { inProgress: state.now.inProgress, next: state.now.next, blocked: state.now.blocked, resume: state.now.resume } : undefined,

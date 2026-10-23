@@ -8,6 +8,36 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-10-23
+
+### Changed
+
+- Standing rules no longer retire by count. Only the newest 8 corrections used to stay, so a long session lost its
+  oldest rules, often its most basic ones, while requests mislabeled as rules kept their places. Now only your
+  withdrawal retires a rule. When the state is over its hard cap, after the work log, decisions and dead ends, the
+  oldest rules are shown as an 80-character excerpt that names the message holding them, instead of being dropped.
+  `caps.corrections` in `longhaul.json` now defaults to 0, no limit up to a safety ceiling of 64 that no real
+  session has come near; a number set there still retires the oldest past it. The log's `capFit` reports
+  `condensedCorrections`.
+- The summarizer's answer is bounded at 32 rules, lifts, decisions and dead ends each, and each rule's text in its
+  prompt is cut to `caps.objectiveQuoteChars` with a pointer to the message, so many long rules cannot grow every
+  compaction's prompt.
+- The summarizer is told more precisely what is not a rule: a request for the work at hand however firmly worded
+  ("make sure the banner is blue"), a question, a report of what you did ("I ran the script"), or an idea still
+  under discussion. A rule is what still binds once the work asked for now is done. `longhaul_remember` says the
+  same. When Longhaul takes over a session, an earlier request is not a rule either, even when it says how the
+  result must behave ("add an export button that saves the report as CSV"). Prompt revisions `state-19` and
+  `turns-11`.
+
+### Fixed
+
+- A `/skill:<name>` invocation's text became standing rules: pi expands the skill into the user message, and its
+  rule-like lines ("Never push the tag before the commit") were recorded as the user's, six from one paste. Only the
+  words typed after the skill can be quoted now, whoever proposes the rule, and the summarizer sees such a message
+  as `[/skill:<name>] <your words>` (in turns mode too, with the skill's text behind `show`). A skill whose text
+  carries its own closing tag or a /goal block cannot pass that text off as yours either. A prompt template
+  (`/<name>`) leaves no such mark, so its text still reads as yours: docs/security.md names this limit.
+
 ## [v1.0.4] - 2026-10-22
 
 ### Fixed

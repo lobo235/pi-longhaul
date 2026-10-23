@@ -117,9 +117,39 @@ export function activeGoalId(branchEntries: SessionEntry[]): string | undefined 
   return goal.status === undefined || goal.status === "active" ? goal.id : undefined;
 }
 
-/** The part of a user message a quote may bind to: the objective of a /goal-mode message, else all of it. */
+/** The head of pi's `/skill:` expansion (agent-session.ts `parseSkillBlock`): the block opens the message. */
+const SKILL_HEAD_RE = /^<skill name="([^"]+)" location="[^"]+">\n/;
+const SKILL_CLOSE = "\n</skill>";
+
+/**
+ * A skill invocation's name and the words the user typed after it ("" when none), or undefined when the message is
+ * not one. pi expands `/skill:<name> words` into the skill's text in a `<skill>` block, then the words after a blank
+ * line; the block is the skill author's text, so a rule in it is never the user's (a pasted skill once became six
+ * rules). The block ends at the LAST closing tag after which nothing, or a blank line and the words, follows: pi does
+ * not escape a skill's text, so text that carries its own closing tag must not pass for the user's words (pi's own
+ * parse takes the first; here the user's words that copy the tag lose words, the skill's text never gains any). A loop
+ * over closing tags rather than pi's lazy pattern, so a long message is read once, never backtracked.
+ */
+export function skillInvocationOf(text: string): { name: string; words: string } | undefined {
+  const head = SKILL_HEAD_RE.exec(text);
+  if (!head) return undefined;
+  let words: string | undefined;
+  for (let at = text.indexOf(SKILL_CLOSE); at >= 0; at = text.indexOf(SKILL_CLOSE, at + 1)) {
+    const end = at + SKILL_CLOSE.length;
+    if (end === text.length) words = "";
+    else if (text.startsWith("\n\n", end) && text.length > end + 2) words = text.slice(end + 2).trim();
+  }
+  return words === undefined ? undefined : { name: head[1], words };
+}
+
+/**
+ * The part of a user message a quote may bind to: the user's own words after a skill's text, then the objective of a
+ * /goal-mode message, else all of it. The skill comes first, so a skill's text that shows a /goal block never names
+ * the objective.
+ */
 export function quotableText(text: string): string {
-  return goalObjectiveOf(text) ?? text;
+  const own = skillInvocationOf(text)?.words ?? text;
+  return goalObjectiveOf(own) ?? own;
 }
 
 /** Words that make a user message read as a standing rule. A pointer for the model, never a verdict: quotes are still verified. */

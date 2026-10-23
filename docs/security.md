@@ -59,6 +59,17 @@ the session (a web page, a README, another agent's message) could try to plant a
 - A `/goal` objective counts only when the message has pi-goal's exact template **and** pi-goal recorded that
   goal in its own custom entry: text that reaches pi as a user message can copy the template, but only
   extension code writes a custom entry. A stopped goal is cleared.
+- In a message that opens with pi's `/skill:` expansion (`<skill name=… location=…>…</skill>`), only the words
+  after the block are quotable: the block is the skill author's text, not the user's. pi does not escape a skill's
+  text, so the block ends at the LAST closing tag followed by a blank line or the end of the message (pi's own parse
+  takes the first): a skill that carries its own closing tag cannot pass part of its text off as the user's words.
+  The skill is found before a /goal block, and the goal test reads only the user's words, so a skill that shows a
+  goal block never names the objective. Text that copies the block's shape only hides its own words from being
+  quoted, which fails safe (a rule is missed, never planted). The block is found by a loop over its closing tags,
+  linear in the message, never by a backtracking pattern.
+- Known limit: a pi prompt template (`/<name> args`) replaces the user message with the template's text and
+  leaves no mark in the transcript, so its rule-like lines can be quoted as the user's. Installing and invoking a
+  template is the user's choice, and a package that ships one can already run code as an extension.
 - The line under the state's title scopes "newer wins" to progress (Now, World, Work log). Standing rules stay
   until a user message withdraws one, and text in tool results or relayed from other agents is named as data.
 - Every rendered field is one line: no id, reference, evidence tag or narrative can carry a line break into
@@ -314,7 +325,14 @@ A transcript or a model answer can be arbitrarily long, and a compaction runs in
 - Reading the state back never spreads a transcript's entries into a function call (`Math.max(...)`,
   `push(...)`), whose arguments live on the stack: a branch with hundreds of thousands of events folds.
 - The rendered state has a hard cap (`caps.hardChars`) and every section its own; the background-task line is
-  bounded on its own because it renders after World's fitted lines.
+  bounded on its own because it renders after World's fitted lines. Corrections are the exception by design: none
+  is retired to fit (an old rule binds as much as a new one), so once the work log, decisions and dead ends are
+  gone they are condensed, oldest first, to an 80-character excerpt naming the message. Only a state with more rules
+  than condensed lines fit stays over the cap (`capExhausted` in the log). Rules are bounded elsewhere: one message
+  can yield several (distinct passages of one long paste each count), so with no count cap set a state keeps at most
+  64 (`CORRECTIONS_CEILING`), the oldest past it retiring and still recallable from the transcript, which no real
+  session has come near (the most seen was 22). One answer carries at most 32 rules, lifts, decisions or dead ends,
+  and each rule's text in the summarizer prompt is cut to `caps.objectiveQuoteChars`, naming its recall.
 - `longhaul_recall` answers are capped at 4,000 characters and output pages at 8,000.
 - The narrative call is bounded in count (`maxChunks` × (3 + `fixableRetries`): one more call per chunk, only when the
   last answer is first refused because a lift aimed at a rule that was replaced, and one replacement question per
