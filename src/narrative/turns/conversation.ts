@@ -17,7 +17,7 @@ import type { CallTrace } from "../types.ts";
 import { callUsageOf } from "../usage.ts";
 
 /** Recorded as the span's promptRevision in turns mode, as NARRATIVE_PROMPT_REVISION is for the single call. */
-export const TURNS_PROMPT_REVISION = "turns-9";
+export const TURNS_PROMPT_REVISION = "turns-11";
 
 export const TURNS_SYSTEM_PROMPT = `You maintain the SESSION STATE of a coding session that is being compacted. The first message holds the digest of the span: the state so far, the user's messages, the commands and errors (with ids), the files, the workspace and a condensed transcript. Code asks for one section at a time. Answer each with ONE JSON object and nothing else. Use only ids that appear in the digest. Call show(ref) to read a user message (u<n>), command (C<n>), error (E<n>) or tool output (T<n>) in full when the digest cut it. ${CREDENTIAL_RULE}`;
 

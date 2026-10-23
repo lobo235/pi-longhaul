@@ -41,6 +41,9 @@ When pi is about to compact and Longhaul is selected (`PI_COMPACTOR` unset, empt
    - every quoted correction must be a verbatim substring of a user message (a quote cited under the wrong
      message binds to the newest message that does hold it; text no user wrote is rejected);
    - in a pi-goal `/goal` message only the objective inside the goal tags is quotable, never pi-goal's template;
+   - in a `/skill:<name>` message only the words typed after the skill are quotable, never the skill's text pi
+     expanded into the message (a pasted skill once became six rules); the message list shows it as
+     `[/skill:<name>] <your words>`;
    - an evidence id the ledger does not know is dropped, and the decision or dead end it backed is kept;
    - shape slips that say nothing about content (`null` for an absent optional, an omitted empty list) are
      normalized before the schema check, and every list and item is bounded by the schema.
@@ -154,7 +157,7 @@ messages in the log; `PI_COMPACT_STATE_DEBUG_STACK=1` adds stack traces.
 | `event` | when | says |
 |---|---|---|
 | `extension-loaded` | pi loads Longhaul (at startup and on a reload) | `piVersion`, `piVersionVerified` (`true` for an exact verified version, `"line"` for a verified release line, `false`) |
-| `compaction` | a pass finished | `span`, `tokensBefore`, `summaryChars`, `narrative` (kind, calls, accepted, dropped, usage, timings, and `reasoning`: the level asked for when the model cannot turn reasoning off), `route`, `capFit`, `world`, `carried`, `durationMs` |
+| `compaction` | a pass finished | `span`, `tokensBefore`, `summaryChars`, `narrative` (kind, calls, accepted, dropped, usage, timings, and `reasoning`: the level asked for when the model cannot turn reasoning off), `route`, `capFit` (the work-log lines, decisions and dead ends retired to fit the hard cap, and `condensedCorrections`), `world`, `carried`, `durationMs` |
 | `compacted` | pi wrote the compaction entry | `fromExtension` (was the summary Longhaul's?), `reason`, `span`, `summaryChars`, `tokensBefore` |
 | `compact-failed` | pi reported the compaction failed | `reason`, `span` |
 | `kept-window-strip` | old reasoning was first left out of a new kept window | `cutoff`, `strippedBlocks`, `strippedChars`, `contextMessages` |

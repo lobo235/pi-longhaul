@@ -57,8 +57,9 @@ Longhaul answers each of these:
 
 - **Carried, not rewritten.** The Session state is updated with a diff, so nothing earlier is paraphrased
   again. A standing rule you gave ("never use mocks; fakes only") is kept in your own words, copied from your
-  message by code, until you withdraw it ("the no-mocks rule no longer applies"). A one-time permission ("go
-  ahead and use a mock here") leaves the rule standing.
+  message by code, until you withdraw it ("the no-mocks rule no longer applies"), however many rules you give:
+  by default none is dropped to make room (up to a safety ceiling of 64), and when the state is full the oldest show
+  their opening words and the message that holds them. A one-time permission ("go ahead and use a mock here") leaves the rule standing.
 - **Old reasoning left behind.** The kept window is handed over without the reasoning the state already
   superseded, so the next span starts from the state and recent tool input and output, as a fresh prompt would
   (*Old reasoning in the kept window*).

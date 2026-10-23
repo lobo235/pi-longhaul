@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { CommandRecord, ErrorRecord } from "../ledger/handoff.ts";
+import { render } from "../render.ts";
 import { closeSpan } from "./close.ts";
 import { commitRemember } from "./commit.ts";
 import { DEFAULT_CAPS, EVENT_ENTRY_TYPE, type StateEvent } from "./events.ts";
-import { project, projectAt } from "./project.ts";
+import { project, projectAt, type SessionState } from "./project.ts";
 import { recall } from "./recall.ts";
 import { closeEvent, ev, logOf, NOW, quote, resetSeq, WORLD } from "./test-support.ts";
 import type { QuoteResolver } from "./verify.ts";
@@ -68,6 +69,20 @@ test("closeSpan: the cap fit retires from the checkpoint the pass renders, but t
   assert.equal(closed.capFit.retired.workLog, 2);
   assert.equal(closed.state.workLog.length, 2);
   assert.equal(project(closed.log, DEFAULT_CAPS).workLog.length, 4, "the log never deletes");
+});
+
+test("closeSpan: under the hard cap with more rules than fit whole, every rule stays in the rendered state, the oldest condensed", () => {
+  const rules = Array.from({ length: 25 }, (_, i) => ev({ kind: "correction.add", id: `R${i + 1}`, quote: quote(`u${i + 2}`, `rule ${i + 1}: always keep the ${"careful ".repeat(28)}order of steps`) }));
+  const caps = { ...DEFAULT_CAPS, hardChars: 5000 };
+  const rendered = (state: SessionState) => render({ state, tokensBefore: 0, ledger: { commands: [], errors: [] }, caps });
+  const closed = closeSpan({ log: logOf(...rules), caps, diffEvents: [], close: { fromRef: "u1", toRef: "u30", narrative: "x", narrativeLess: false, world: WORLD }, at: "t", measure: (state) => rendered(state).length });
+  const text = rendered(closed.state);
+  assert.equal(closed.capFit.exhausted, false);
+  assert.ok(text.length <= caps.hardChars, `${text.length} chars`);
+  for (let i = 1; i <= 25; i++) assert.match(text, new RegExp(`^- R${i} \\[u${i + 1}\\] "rule ${i}: `, "m"), `R${i} is still shown`);
+  assert.ok(closed.capFit.condensed > 0 && closed.capFit.condensed < 25);
+  assert.ok(closed.state.corrections[0].condensed && !closed.state.corrections[24].condensed, "the oldest condense first");
+  assert.match(text, /^- R1 \[u2\] "rule 1: [^"]*… \(longhaul_recall message u2\)"$/m);
 });
 
 test("recall: by what, by query, by ordinal; retired and lifted items stay reachable; span slices carry commands and errors", () => {

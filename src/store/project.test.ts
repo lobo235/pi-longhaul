@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_CAPS } from "./events.ts";
+import { CORRECTIONS_CEILING, DEFAULT_CAPS } from "./events.ts";
 import { activeCorrections, activeDecisions, activeWorkLog, acceptedRemembers, emptyState, project, projectAt } from "./project.ts";
 import { closeEvent, ev, logOf, NOW, quote, resetSeq } from "./test-support.ts";
 
@@ -25,14 +25,28 @@ test("objective: set, doneWhen attached, and a later set MOVES it keeping the pr
   assert.deepEqual(state.objective?.movedFrom, [{ quote: quote("u1", "build the state compactor"), span: 1 }]);
 });
 
-test("corrections: added in order with ids, cursor follows the highest id, the oldest retires past the cap", () => {
-  const events = Array.from({ length: DEFAULT_CAPS.corrections + 1 }, (_, i) => ev({ kind: "correction.add", id: `R${i + 1}`, quote: quote(`u${i + 2}`, `rule number ${i + 1} stands`) }));
+test("corrections: added in order with ids, cursor follows the highest id, and none retires by count", () => {
+  const events = Array.from({ length: 30 }, (_, i) => ev({ kind: "correction.add", id: `R${i + 1}`, quote: quote(`u${i + 2}`, `rule number ${i + 1} stands`) }));
   const state = project(logOf(...events), DEFAULT_CAPS);
-  assert.equal(activeCorrections(state).length, DEFAULT_CAPS.corrections);
-  assert.equal(state.corrections[0].retired, true);
-  assert.equal(state.retired.corrections, 1);
-  assert.equal(state.cursor.R, DEFAULT_CAPS.corrections + 1);
+  assert.deepEqual(activeCorrections(state).map((item) => item.id), events.map((_, i) => `R${i + 1}`), "an old rule is as binding as a new one: only a lift retires it");
+  assert.equal(state.retired.corrections, 0);
+  assert.equal(state.cursor.R, 30);
   assert.equal(state.seq, events.at(-1)!.seq);
+});
+
+test("corrections: with no count cap, a runaway session still stops at the safety ceiling, the oldest retiring past it", () => {
+  const events = Array.from({ length: CORRECTIONS_CEILING + 6 }, (_, i) => ev({ kind: "correction.add", id: `R${i + 1}`, quote: quote(`u${i + 2}`, `rule number ${i + 1} stands`) }));
+  const state = project(logOf(...events), DEFAULT_CAPS);
+  assert.equal(activeCorrections(state).length, CORRECTIONS_CEILING);
+  assert.equal(activeCorrections(state)[0].id, "R7", "the oldest six retire, each still recallable from the transcript");
+  assert.equal(state.retired.corrections, 6);
+});
+
+test("corrections: a count cap set in the config retires the oldest past it, as before 1.1", () => {
+  const events = Array.from({ length: 5 }, (_, i) => ev({ kind: "correction.add", id: `R${i + 1}`, quote: quote(`u${i + 2}`, `rule number ${i + 1} stands`) }));
+  const state = project(logOf(...events), { ...DEFAULT_CAPS, corrections: 3 });
+  assert.deepEqual(activeCorrections(state).map((item) => item.id), ["R3", "R4", "R5"]);
+  assert.equal(state.retired.corrections, 2);
 });
 
 test("lifts: a lifted correction stays hot through the close of its own span (the summary shows it once as lifted), then retires at the following close; ids R/D/X are independent", () => {

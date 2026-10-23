@@ -6,7 +6,7 @@
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
-import { EXCERPT_CHARS, goalObjectiveOf, normalizeWs, type IndexedUserMessage, type MessageIndex } from "../intent.ts";
+import { EXCERPT_CHARS, goalObjectiveOf, normalizeWs, skillInvocationOf, type IndexedUserMessage, type MessageIndex } from "../intent.ts";
 import { closedWhole } from "../store/events.ts";
 
 /**
@@ -61,9 +61,20 @@ function prefixed(message: AgentMessage, ordinal: string): AgentMessage {
   return { ...message, content } as AgentMessage;
 }
 
+/** How a skill invocation is named wherever the summarizer is shown it: the skill's text is not the user's. */
+export const skillTag = (name: string): string => `[/skill:${normalizeWs(name).slice(0, 40)}]`;
+
+/** What the message list shows: a /goal by its objective, a skill invocation by its name and the user's own words. */
+export function listedExcerpt(text: string): string {
+  const skill = skillInvocationOf(text);
+  const goal = goalObjectiveOf(skill?.words ?? text);
+  if (goal) return `[/goal] ${normalizeWs(goal)}`.slice(0, EXCERPT_CHARS + 8);
+  if (skill) return `${skillTag(skill.name)} ${skill.words ? spanExcerpt(skill.words) : "(no words of the user's own)"}`;
+  return spanExcerpt(text);
+}
+
 function ordinalEntry(indexed: IndexedUserMessage): SpanInput["ordinals"][number] {
-  const goal = goalObjectiveOf(indexed.text);
-  return { ordinal: indexed.ordinal, excerpt: goal ? `[/goal] ${normalizeWs(goal)}`.slice(0, EXCERPT_CHARS + 8) : spanExcerpt(indexed.text), text: indexed.text };
+  return { ordinal: indexed.ordinal, excerpt: listedExcerpt(indexed.text), text: indexed.text };
 }
 
 export function prepareSpan(input: { messagesToSummarize: AgentMessage[]; turnPrefixMessages: AgentMessage[]; index: MessageIndex }): SpanInput {

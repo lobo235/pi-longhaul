@@ -54,7 +54,7 @@ function credentialRefusal(proposal: Proposal, branch: Parameters<typeof message
 }
 
 const PARAMETERS = Type.Object({
-  kind: Type.Union(REMEMBER_KINDS.map((kind) => Type.Literal(kind)), { description: "correction: a standing rule the user gave (quote). lift: the user withdrew a correction (target + quote). decision / dead-end: your own one sentence (text, evidence). done-when: the user's acceptance words (quote)." }),
+  kind: Type.Union(REMEMBER_KINDS.map((kind) => Type.Literal(kind)), { description: "correction: a standing rule the user gave, still binding after the current task (quote). lift: the user withdrew a correction (target + quote). decision / dead-end: your own one sentence (text, evidence). done-when: the user's acceptance words (quote)." }),
   quote: Type.Optional(Type.String({ description: "The user's exact words, a substring of one user message (12+ chars). Example: \"never use mocks in these tests\"." })),
   text: Type.Optional(Type.String({ description: "Your own sentence for a decision or dead end. Example: \"Copied the ledger modules instead of importing them across extensions\"." })),
   evidence: Type.Optional(Type.String({ description: "C<n>, E<n>, u<n>, \"last command\" or \"last error\"." })),
@@ -67,7 +67,7 @@ export function registerRememberTool(pi: ExtensionAPI, deps: { readConfig: ReadF
     label: "Remember",
     description: "Write one verified item into the session state that survives compaction: a user correction (their exact words), a lift, a decision, a dead end, or the acceptance criterion. Rejections say why and whether to retry.",
     promptGuidelines: [
-      `Call \`${REMEMBER_TOOL}\` the moment the user states a standing rule (kind correction, quote their exact words) or when you settle a decision or abandon an approach (kind decision / dead-end, one sentence with evidence C<n>/E<n>/u<n>).`,
+      `Call \`${REMEMBER_TOOL}\` the moment the user states a standing rule, one that still binds once the current task is done (kind correction, quote their exact words; a request for the task at hand is not one), or when you settle a decision or abandon an approach (kind decision / dead-end, one sentence with evidence C<n>/E<n>/u<n>).`,
       "Never paraphrase a correction: the quote must be a substring of a user message, at least 12 characters, or it is rejected with the closest match.",
     ],
     parameters: PARAMETERS,

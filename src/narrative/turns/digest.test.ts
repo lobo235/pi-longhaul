@@ -69,3 +69,11 @@ test("buildDigest: no commands, errors or messages say so instead of leaving emp
   assert.ok(text.includes("<commands>\n(none)\n</commands>"));
   assert.ok(text.includes("<errors>\n(none)\n</errors>"));
 });
+
+test("buildDigest: a skill invocation shows the skill's name and the user's own words; the skill's text is behind show(uN)", () => {
+  const invoked = '<skill name="release" location="/skills/release/SKILL.md">\nReferences are relative to /skills/release.\n\n# Release\n\nNever push the tag first.\n</skill>\n\nrelease the widget app';
+  const digest = buildDigest(input({ userMessages: [{ ordinal: "u4", text: invoked }], textOf: () => invoked }));
+  assert.ok(digest.text.includes("[u4] [/skill:release] release the widget app\n[the skill's text: show u4]"));
+  assert.ok(!digest.text.includes("Never push the tag first"));
+  assert.equal(digest.show("u4"), invoked);
+});

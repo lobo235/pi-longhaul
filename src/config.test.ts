@@ -36,6 +36,7 @@ test("resolveStateConfig: each key overrides independently and is bounded (table
   const cases: Array<[string, Record<string, unknown>, (config: ReturnType<typeof resolveStateConfig>) => void]> = [
     ["caps merge per key", { caps: { hardChars: 8000, decisions: "x" } }, (c) => { assert.equal(c.caps.hardChars, 8000); assert.equal(c.caps.decisions, DEFAULT_CAPS.decisions); }],
     ["caps below the floor fall back", { caps: { hardChars: 100 } }, (c) => assert.equal(c.caps.hardChars, DEFAULT_CAPS.hardChars)],
+    ["corrections: 0 by default (every rule kept until lifted); a count asked for is honoured", { caps: { corrections: 3 } }, (c) => { assert.equal(DEFAULT_CAPS.corrections, 0); assert.equal(c.caps.corrections, 3); }],
     ["claim patterns replace the list when well-formed", { claimPatterns: [{ pattern: "make ci", kind: "test" }] }, (c) => assert.deepEqual(c.claimPatterns, [{ pattern: "make ci", kind: "test" }])],
     ["a malformed claim pattern keeps the defaults", { claimPatterns: [{ pattern: "x", kind: "bogus" }] }, (c) => assert.deepEqual(c.claimPatterns, DEFAULT_CLAIM_PATTERNS)],
     ["remember cap bounded 1..50", { rememberPerSpan: 500 }, (c) => assert.equal(c.rememberPerSpan, DEFAULT_REMEMBER_PER_SPAN)],
@@ -62,7 +63,7 @@ test("resolveStateConfig: each key overrides independently and is bounded (table
     ["turns policy via resolveTurnsPolicy", { narrativeTurns: { repairTurns: 1, disabledChecks: ["now.resume"] } }, (c) => { assert.equal(c.narrativeTurns.repairTurns, 1); assert.deepEqual(c.narrativeTurns.disabledChecks, ["now.resume"]); }],
   ];
   for (const [, raw, check] of cases) check(resolveStateConfig(() => JSON.stringify(raw)));
-  assert.equal(cases.length, 26);
+  assert.equal(cases.length, 27);
 });
 
 test("resolveNarrativeRoute: env wins, then config; with neither, no session routes (it summarizes on its own model)", () => {

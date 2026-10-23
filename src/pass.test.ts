@@ -379,7 +379,7 @@ test("runStatePass: narrativeMode turns asks section by section, sees the defaul
   assert.match(firstTurns[0], /Modified: src\/b.ts/);
   assert.deepEqual(result.pending.events.map((event) => event.kind), ["objective.set", "correction.add", "decision.add", "now.set", "span.close"]);
   assert.match(result.compaction.summary, /R1 \[u2\] "never use mocks in these tests, fakes only"/, "code copied the user's whole message");
-  assert.equal(result.compaction.details!.promptRevision, "turns-9");
+  assert.equal(result.compaction.details!.promptRevision, "turns-11");
   assert.equal(result.compaction.details!.narrative.sections?.length, 5);
 });
 

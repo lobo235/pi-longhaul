@@ -29,14 +29,17 @@ const QuoteRef = Type.Object({ messageRef: Ref, text: Text });
 const NowItem = Type.String({ maxLength: NOW_ITEM_CHARS });
 const NowList = Type.Array(NowItem, { maxItems: NOW_ITEMS });
 
+/** The most rules, lifts, decisions or dead ends one answer may carry: far above a real span's, so only a runaway answer is refused. */
+export const LIST_ITEMS = 32;
+
 export const NarrativeDiffSchema = Type.Object({
   narrative: Text,
   objective: Type.Optional(Type.Object({ messageRef: Ref, text: Text, doneWhen: Type.Optional(QuoteRef) })),
-  corrections: Type.Array(QuoteRef),
+  corrections: Type.Array(QuoteRef, { maxItems: LIST_ITEMS }),
   /** `text` is the withdrawing words: unlike a summary's handoff, the diff hand quotes too. */
-  lifts: Type.Array(Type.Object({ target: Ref, messageRef: Ref, text: Text })),
-  decisions: Type.Array(Type.Object({ text: Text, evidence: Type.Optional(Ref) })),
-  deadEnds: Type.Array(Type.Object({ text: Text, evidence: Type.Optional(Ref) })),
+  lifts: Type.Array(Type.Object({ target: Ref, messageRef: Ref, text: Text }), { maxItems: LIST_ITEMS }),
+  decisions: Type.Array(Type.Object({ text: Text, evidence: Type.Optional(Ref) }), { maxItems: LIST_ITEMS }),
+  deadEnds: Type.Array(Type.Object({ text: Text, evidence: Type.Optional(Ref) }), { maxItems: LIST_ITEMS }),
   now: Type.Object({ inProgress: NowList, next: NowList, blocked: NowList, resume: NowItem }),
   /** Every user message of the span, labeled (message-labels.ts): code turns a "rule" into a correction in the user's own words. */
   labels: Type.Optional(Type.Record(Type.String(), Type.Unknown())),

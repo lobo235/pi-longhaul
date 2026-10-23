@@ -1,14 +1,17 @@
 /**
  * The Digest (CONTEXT.md *Digest*): what code knows about the span, built once and sent whole at the
  * start of the turn conversation -- the state so far, on a switchover the previous summary and the
- * user's earlier rule-shaped messages, the span's user messages verbatim with ordinals, the ledger's
- * commands and errors with outcomes, the file lists, World, and the condensed transcript. `show(ref)`
- * answers the one read-only tool: a user message, command or error record, or a whole tool output.
+ * user's earlier rule-shaped messages, the span's user messages verbatim with ordinals (a skill
+ * invocation by its name and the user's own words), the ledger's commands and errors with outcomes,
+ * the file lists, World, and the condensed transcript. `show(ref)` answers the one read-only tool: a
+ * user message, command or error record, or a whole tool output.
  */
 import { renderCommandLine, renderErrorLine } from "../../ledger/handoff-render.ts";
 import type { CommandRecord, ErrorRecord } from "../../ledger/handoff.ts";
 import type { FileLists } from "../../carry.ts";
 import { renderFilesSection } from "../../files-render.ts";
+import { skillInvocationOf } from "../../intent.ts";
+import { skillTag } from "../prepare.ts";
 import { stateBlock, type PromptState } from "../prompt.ts";
 import type { CondensedTranscript } from "./transcript.ts";
 
@@ -36,10 +39,14 @@ export const USER_MESSAGE_CAP = { head: 3000, tail: 1000 };
 /** One show() answer, at most. */
 export const SHOW_CHARS = 8000;
 
+/** A skill invocation is shown by its name and the user's own words; the skill's text is behind show(uN). */
 function userMessageLine(message: { ordinal: string; text: string }): string {
+  const skill = skillInvocationOf(message.text);
+  const text = skill ? `${skillTag(skill.name)} ${skill.words || "(no words of the user's own)"}` : message.text;
+  const pointer = skill ? `\n[the skill's text: show ${message.ordinal}]` : "";
   const { head, tail } = USER_MESSAGE_CAP;
-  if (message.text.length <= head + tail) return `[${message.ordinal}] ${message.text}`;
-  return `[${message.ordinal}] ${message.text.slice(0, head)}\n[… ${message.text.length - head - tail} chars, show ${message.ordinal} …]\n${message.text.slice(-tail)}`;
+  if (text.length <= head + tail) return `[${message.ordinal}] ${text}${pointer}`;
+  return `[${message.ordinal}] ${text.slice(0, head)}\n[… ${text.length - head - tail} chars, show ${message.ordinal} …]\n${text.slice(-tail)}${pointer}`;
 }
 
 const block = (tag: string, lines: string[], empty = "(none)") => `<${tag}>\n${lines.length ? lines.join("\n") : empty}\n</${tag}>`;

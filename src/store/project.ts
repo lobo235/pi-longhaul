@@ -1,11 +1,13 @@
 /**
  * Hot memory is `project(log, caps)`: a pure reducer over accepted events. Per-kind caps retire
- * the oldest of a kind on add; a lift marks a correction, and a correction lifted in an earlier
+ * the oldest decision or dead end on add. A correction does not retire by count unless `caps.corrections` asks
+ * for it (0, the default, never), since an old rule binds as much as a new one: a lift marks it, and a correction lifted in an earlier
  * span is retired, so it renders as lifted exactly once; a span close appends the work-log line,
  * carries World, and consolidates work-log lines past the cap into one code-written line.
  * Retirement is a projection rule: the log never deletes, and recall reads the log.
  */
 import type { Caps, ForeignCompactor, Now, Quote, Source, StateEvent, StateLog, World } from "./events.ts";
+import { CORRECTIONS_CEILING } from "./events.ts";
 import { DEFAULT_NEAR_DUPLICATE_THRESHOLD, overlap, tokenize } from "./near-duplicate.ts";
 import { oneLine } from "../one-line.ts";
 import { scrubCredentials } from "../credential-scrub.ts";
@@ -19,6 +21,8 @@ export interface CorrectionItem {
   seq: number;
   liftedBy?: { messageId: string; ordinal: string; span: number };
   retired: boolean;
+  /** Set by the cap fit alone (capfit.ts): rendered as an excerpt naming its recall, never projected. */
+  condensed?: boolean;
   /** Ids this rule held before being recorded again from its message (addCorrection); see liftTarget. */
   formerIds?: Set<string>;
   /** `span:seq` of the earlier correction.add events folded into this rule, for recall (addCorrection). */
@@ -183,7 +187,7 @@ function addCorrection(state: SessionState, event: Extract<StateEvent, { kind: "
   const copyKeys = earlier?.copyKeys ?? [];
   if (earlier) copyKeys.push(eventKey(earlier));
   state.corrections.push({ id: event.id, quote: event.quote, span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false, ...(formerIds.size ? { formerIds } : {}), ...(copyKeys.length ? { copyKeys } : {}) });
-  state.retired.corrections += retireOverCap(state.corrections, caps.corrections);
+  state.retired.corrections += retireOverCap(state.corrections, caps.corrections > 0 ? caps.corrections : CORRECTIONS_CEILING);
 }
 
 export function applyEvent(previous: SessionState, event: StateEvent, caps: Caps): SessionState {

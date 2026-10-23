@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import type { CommandRecord, ErrorRecord } from "./ledger/handoff.ts";
-import { render, renderQuote, type RenderInput } from "./render.ts";
+import { CONDENSED_CORRECTION_CHARS, render, renderQuote, type RenderInput } from "./render.ts";
 import { DEFAULT_CAPS } from "./store/events.ts";
 import { project } from "./store/project.ts";
 import { closeEvent, ev, logOf, NOW, quote, resetSeq, WORLD } from "./store/test-support.ts";
@@ -160,4 +160,18 @@ test("render: retired counts appear once per section when non-zero", () => {
   assert.match(text, /## Constraints & corrections \(verbatim, newest last; 2 retired, longhaul_recall corrections\)/);
   assert.match(text, /## Decisions & dead ends \(append-only, with evidence; 1 retired, longhaul_recall decisions\)/);
   assert.match(text, /## Work log \(one line per span; detail via longhaul_recall; 3 retired\)/);
+});
+
+test("render: a correction the cap fit condensed is cut to an excerpt naming its message, and keeps its id and ordinal", () => {
+  const input = fullInput();
+  const words = "every dry-run line must start with DRY: and the real run must print nothing on that line ".repeat(3).trim();
+  input.state.corrections = [
+    { id: "R1", quote: quote("u2", words), span: 1, source: "diff", seq: 1, retired: false, condensed: true },
+    { id: "R2", quote: quote("u3", words), span: 1, source: "diff", seq: 2, retired: false },
+  ];
+  const lines = render(input).split("\n");
+  const r1 = lines.find((line) => line.startsWith("- R1 "))!;
+  const r2 = lines.find((line) => line.startsWith("- R2 "))!;
+  assert.equal(r1, `- R1 [u2] "${words.slice(0, CONDENSED_CORRECTION_CHARS - 1)}… (longhaul_recall message u2)"`);
+  assert.equal(r2, `- R2 [u3] "${words}"`, "a correction not condensed renders whole up to correctionChars");
 });

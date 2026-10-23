@@ -66,8 +66,10 @@ The workspace at the moment of compaction: branch, commit, whether the tree is c
 test, build or lint command, open errors, background tasks still running. Newer than anything the model wrote.
 
 **Correction**:
-A standing rule the user gave, kept verbatim with the message it came from. A **Lift** is the user withdrawing
-one; the correction stays visible as history.
+A standing rule the user gave, kept verbatim with the message it came from: one that still binds once the work
+asked for now is done, never a request for that work. Only a **Lift**, the user withdrawing one, retires it, never
+their number (short of a safety ceiling no real session reaches); the correction stays visible as history. A **Condensed** correction is one the hard cap shows as an
+excerpt naming its message. A skill's text is never a correction: it is the skill author's, not the user's.
 _Avoid_: preference, constraint (pi's own summary heading, not this concept)
 
 **Learned values**:
