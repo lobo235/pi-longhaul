@@ -27,7 +27,7 @@ const KEY_CHARS = 64;
 const BLOCK_OPENER = /^(?:[|>](?:[-+]?\d?|\d[-+])|[{[])?\s*(?:#.*)?$/;
 
 /** A line read as `key = value`, `key: value` or `key    value` (aligned table), or undefined when it is not one. */
-function keyedLine(line: string): { key: string; value: string } | undefined {
+export function keyedLine(line: string): { key: string; value: string } | undefined {
   const text = line.trim();
   const separator = text.slice(0, KEY_CHARS + 1).search(/[=:]|\s{2,}|\t/);
   if (separator <= 0) return undefined;

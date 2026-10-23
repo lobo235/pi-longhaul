@@ -349,7 +349,16 @@ compaction than one that can.
   never from a line that looks like it holds a credential. A value the summarizer names is kept only when it
   stands in the turn it cites and no part of it stood on a credential line anywhere in the span; its name is
   shown as the summarizer's label.
-  That filter works on patterns: a bare token with no key or secret marker near it can still be learned and
+- What the summarizer writes into the state (the narrative, Now, decisions and dead ends) has each credential
+  value replaced by `<redacted>` before it is recorded: a whole value the span showed as a credential (a credential
+  key's value, a command's password argument, a secret store's output, `the password is …`), however it is wrapped, a value after a credential key,
+  `Bearer` or a credential word, a `user:pass@` password, and token shapes (JWTs, Vault, AWS, GitHub, OpenAI-style,
+  Slack, age). States written before this are shown the same way from their next compaction on, by everything but
+  the span's own credentials; a stored summary and the transcript keep what they hold, so rotate a credential found
+  in a state.
+  The prompt also tells the summarizer never to copy one, and `longhaul_remember` refuses a decision or dead end
+  that carries one. Error lines are recorded with the value redacted.
+  These filters work on patterns: a bare token with no key or secret marker near it can still be learned and
   carried. Treat a session's transcript as you would its tool output.
 
 The threat model is in [docs/security.md](docs/security.md).

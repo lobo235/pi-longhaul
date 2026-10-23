@@ -6,6 +6,7 @@
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
+import { CREDENTIAL_RULE, scrubCredentials } from "../credential-scrub.ts";
 import { normalizeWs } from "../intent.ts";
 import { quoteText } from "../render.ts";
 import { DEFAULT_CAPS, type Now, type Quote, type StateEvent } from "../store/events.ts";
@@ -35,7 +36,7 @@ import { LABEL_FORMS, LIFT_GUIDANCE, RULE_DEFINITION, RULE_WHOLE_CHARS } from ".
  * state-16: outside a /goal, the session's opening request is the goal line once the Request has moved from it
  *   (store/project.ts goalLine), so the project's purpose survives every compaction; never quoted as the objective.
  */
-export const NARRATIVE_PROMPT_REVISION = "state-16";
+export const NARRATIVE_PROMPT_REVISION = "state-17";
 
 export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a coding session that is being compacted. You are given the state so far, the user's messages with their ordinals (u1, u2, ...), and the conversation being compacted. Answer with ONE fenced json block and nothing else:
 
@@ -52,7 +53,7 @@ export const NARRATIVE_SYSTEM_PROMPT = `You maintain the SESSION STATE of a codi
 }
 \`\`\`
 
-Rules. "objective" is the request the work is answering now. It is optional: include it only when none is set or the user moved to a different request in this span, and quote the user's own message verbatim. The goal line, when present, is the active /goal or the session's opening request: code keeps it, so never quote it as the objective; under a goal the objective is the specific ask. "labels": Label EVERY message in <user-messages> with one of ${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} The target is R<n> from the state, or u<n> for a rule given earlier in this span. "not a rule" is a request, question, answer, approval or one-off. Code copies the user's words into the state, so a short message labeled a rule needs no quote; a message longer than ${RULE_WHOLE_CHARS} characters labeled a rule must come with the rule's exact words: {"u7": {"rule": "<exact words>"}}. "corrections" is only for a standing rule that an earlier summary records and no listed message gives; quote the user's exact words. "values": values a later turn may need again that no file will give back: a measurement, a total, a port or a count a turn reported, a hash it named, a file-name format the user chose ("<name>-YYYYMMDD.tar.gz"). Copy each exactly as it appears in the turn "ref" names (the user's message, your replies and the tool output up to the next user message); a value is a number with or without its unit ("166 ms"), a version, a short commit hash, a path or file name (with <placeholders> if the format has them), a host:port or a date; nothing else is kept. "name" is a short label (at most 40 characters, no colon) saying what it is. At most 12, never a password, key or token. "decisions" and "deadEnds" are your own one-sentence records with evidence: a command id C<n>, an error id E<n>, a message u<n>, or the words "last command" / "last error". "now" replaces the previous Now entirely. Never write "done" unless the state's Done gate line says met. Empty arrays are fine. No prose outside the fence.`;
+Rules. "objective" is the request the work is answering now. It is optional: include it only when none is set or the user moved to a different request in this span, and quote the user's own message verbatim. The goal line, when present, is the active /goal or the session's opening request: code keeps it, so never quote it as the objective; under a goal the objective is the specific ask. "labels": Label EVERY message in <user-messages> with one of ${LABEL_FORMS}. ${RULE_DEFINITION} ${LIFT_GUIDANCE} The target is R<n> from the state, or u<n> for a rule given earlier in this span. "not a rule" is a request, question, answer, approval or one-off. Code copies the user's words into the state, so a short message labeled a rule needs no quote; a message longer than ${RULE_WHOLE_CHARS} characters labeled a rule must come with the rule's exact words: {"u7": {"rule": "<exact words>"}}. "corrections" is only for a standing rule that an earlier summary records and no listed message gives; quote the user's exact words. "values": values a later turn may need again that no file will give back: a measurement, a total, a port or a count a turn reported, a hash it named, a file-name format the user chose ("<name>-YYYYMMDD.tar.gz"). Copy each exactly as it appears in the turn "ref" names (the user's message, your replies and the tool output up to the next user message); a value is a number with or without its unit ("166 ms"), a version, a short commit hash, a path or file name (with <placeholders> if the format has them), a host:port or a date; nothing else is kept. "name" is a short label (at most 40 characters, no colon) saying what it is. At most 12, never a password, key or token. "decisions" and "deadEnds" are your own one-sentence records with evidence: a command id C<n>, an error id E<n>, a message u<n>, or the words "last command" / "last error". "now" replaces the previous Now entirely. Never write "done" unless the state's Done gate line says met. ${CREDENTIAL_RULE} Empty arrays are fine. No prose outside the fence.`;
 
 export interface PromptState {
   /** The Goal line (store/project.ts goalLine), shown so the summarizer never re-picks it as the Request. */
@@ -110,8 +111,9 @@ const rememberedText = (event: StateEvent): { kind: string; text: string } | und
   switch (event.kind) {
     case "correction.add": return { kind: "correction", text: `${event.id} [${event.quote.ordinal}] ${event.quote.text}` };
     case "correction.lift": return { kind: "lift", text: `${event.target} lifted by ${event.by.ordinal}` };
-    case "decision.add": return { kind: "decision", text: `${event.id} ${event.text}` };
-    case "deadEnd.add": return { kind: "dead-end", text: `${event.id} ${event.text}` };
+    // Written by a tool call this span: the projection has not seen it, so it is scrubbed here (credential-scrub.ts).
+    case "decision.add": return { kind: "decision", text: `${event.id} ${scrubCredentials(event.text).text}` };
+    case "deadEnd.add": return { kind: "dead-end", text: `${event.id} ${scrubCredentials(event.text).text}` };
     case "objective.set": return { kind: "objective", text: `${event.quote.ordinal} ${event.quote.text}` };
     case "objective.doneWhen": return { kind: "done-when", text: `${event.quote.ordinal} ${event.quote.text}` };
     default: return undefined;

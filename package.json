@@ -1,6 +1,6 @@
 {
   "name": "pi-longhaul",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Keep pi sessions working all night. A compactor that carries your session forward instead of rewriting it: your rules kept in your own words, the state written by code, old reasoning left behind, and about 5x faster than pi's own compaction on a local model.",
   "type": "module",
   "license": "MIT",
@@ -32,7 +32,7 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.0.3/.github/assets/infographic.png"
+    "image": "https://raw.githubusercontent.com/lobo235/pi-longhaul/v1.0.4/.github/assets/infographic.png"
   },
   "files": [
     "src/**/*.ts",

@@ -217,6 +217,64 @@ the session (a web page, a README, another agent's message) could try to plant a
   replacement. A credential token anywhere in those turns refuses a value of the span as well, and so does one in
   the original words of an edited message, in a message another extension injected, or on a credential line of the
   summary, which is never a source itself.
+- What the summarizer writes into the state (the narrative, every Now item and Resume, decisions, dead ends) is
+  scrubbed before the span record is written (`credential-scrub.ts`): each credential value is replaced by
+  `<redacted>` and the words around it stay. A value counts when its shape is one wherever it stands (a JWT, a Vault
+  token, a private key's whole body, AWS, GitHub, GitLab, Google API, Stripe, npm, Hugging Face, OpenAI-style, Slack
+  and age keys); when the text names it, as a credential key's value (`DB_PASSWORD=`, `PGPASSWORD=`, `MYSQL_PWD=`,
+  `"api_key":`, escaped quotes too, symbols kept in the value up to a space or a quote; a password word may be glued
+  to its prefix, any other only after `_` or `-`, so `compass:` is no key; a value-like or opaque one of twelve
+  characters or more, never a path, and a number, count, version or date only as six digits and more under a key
+  that says password in full, so `token: missing`, `tests pass: 120/120` and `e2e_pass: 1234567` stay), a value-like
+  `Bearer` or `Basic` value, the password of a `user:pass@` URL (to the word's last `@`), or a random-looking value
+  (a UUID, hex from 20 characters, a long mixed-case run with digits) starting within 40 characters after a
+  credential word; or when it is one of the span's credentials (`span-credentials.ts`): a whole value the span
+  itself showed as a credential, found however the summarizer wrapped it (quoted, bold, between dashes or curly
+  quotes, after `=`, glued to a flag, in a login with or without a scheme: `app/x@db`, `app:x@db:5432`). The span's
+  credentials come from everything the summarizer was shown: the span, the previous summary, a switchover's earlier
+  user messages and, in warm mode, the session's last request. They are built from strong evidence only, because each
+  one is taken out everywhere: what the text rules above name; the value of a key named for one credential,
+  ending in its name or a short part after it (singular, so `tokens: 1200` and a list of `secrets` are not one, and
+  no key about one: `password_policy`, `token_env`), any shape under a password key
+  (`Summer2024.x`, `unmade-tremor-oxidize`, `48291375`), not a name under a token, secret or key key (`app-token`,
+  `APP_TOKEN`, a file or host name); a command's password argument (`mysql -pX`, `sshpass -p X`, `redis-cli -a
+  X`, `curl -u user:X`, `htpasswd -b FILE USER X`, `--db-password X`, `openssl -pass pass:X`, `keytool -storepass
+  X`); a random-looking word on another credential line; a value a secret store printed alone (or a random-looking
+  one among its other output); and `the password is …`, `the db pass is …`. Never a number (but a password's),
+  version, date or path, nor one plain lowercase word. A key holds its quoted string or its first word (after Go's
+  `:=` or a type, `db_password: str = "…"`; a YAML password's plain value runs to the line's end), never the rest of
+  a command line, and nothing when its value is computed (`TOKEN=$(vault kv get … | python3 -c "import sys,json")`
+  once made `python3` a credential); a random-looking word the word before it on its line labels as an id or a hash
+  (`Evaluation ID:`, `plan_hash`, `commit`) is that, not a secret, unless the label names a credential
+  (`secret_id`); and an upper-case `--- PASS: TestName` is a test runner's status, while `pass: 'x'` and `pass=x`
+  are keys. A credential word inside a path or file name (`/tmp/admin-bearer.txt`,
+  `~/.vault-token`) says where one lives, so the value after it is not taken for one. The broader set that refuses a named value
+  (narrative/named-values.ts, with the words after "pin", "card" or "login" and a secret store's whole output)
+  redacted versions, commit hashes and names in about a third of real fields, so the scrub does not use it. A
+  `sha256:` digest is never one, and a variable or placeholder (`$KEY`, `<from vault>`) stays. The projection applies
+  the text rules only, since only the pass that wrote a record had its span, so a record written before the scrub
+  shows redacted wherever the state is read from its session's next compaction on: the summary, the summarizer's
+  prompt (the open span's remembered items too), `longhaul_recall` (every hit, error lines and the span's narrative
+  included) and the state CLI. Nothing rewrites what is stored: pi re-sends the latest compaction's summary string
+  until the next compaction (on an older branch, whenever someone returns to it), and the transcript keeps the old
+  summaries, `details.state` checkpoints, span records, remember entries and the turns trace's model-written
+  reasons. A credential found in a state was sent with every request since; rotate it. `longhaul_remember` refuses
+  a decision or dead end that the scrub would change, with the credentials of every message still in context (the
+  kept window included). Measured on 24 real transcripts: the text rules redact 22 values over 6612 model-written
+  fields, at least one of them not a secret (an Ed25519 public key after "key"); the span's credentials, each span
+  against its own messages and the summary before it, redact 7 more over 2981 fields in 224 spans, every one a
+  credential or the visible part of one (a Wi-Fi passphrase, two admin passwords, a token's printed prefix, a rotated
+  secret's prefix). The summarizer prompts say never to
+  copy a credential's value; the scrub is what holds when a model does. An error signature with a command-style
+  shape is never recorded; any other is recorded as the scrub leaves it (`password (64-hex): <redacted>`), carried
+  ones too, so an ordinary failure that mentions a secret by id stays open. Every pattern is linear on hostile text
+  (T4); a private key without an END line is cut 16 KiB on. Not found: a credential the span never showed as one,
+  written in prose with no credential word near it; a token or secret key's value shaped as a name; without the
+  span, a value on the line after its key (`password:` then the value), a key in smart quotes or before a full-width
+  colon; a password given to `docker login -p` or piped to a `--password-stdin` command; a passphrase with spaces
+  (`correct horse battery staple`); a key about a password rather than holding one (`password_policy:`) gives no
+  value, by design; and a symbol at a value's edge (`Summer2024!` leaves `<redacted>!`). The user's own words (objective,
+  done-when and correction quotes) are verbatim by design and not scrubbed.
 - The ledger redacts commands that carry a secret, by the same patterns (a one-time-password seed passed to
   `oathtool -b` (or `-bv`, `--base32`, or a hex or base32 key of 16 or more characters), `ykman oath accounts add`,
   `ykman ... --key`, `sshpass -p`, `htpasswd -b`, `openssl -pass pass:`, `keytool -storepass`, `redis-cli -a`,

@@ -6,8 +6,15 @@
 import type { CommandRecord, ErrorRecord } from "../ledger/handoff.ts";
 import type { Caps, StateEvent, StateLog } from "./events.ts";
 import { orderedFiles } from "../files-render.ts";
-import { oneLine as sanitize } from "../one-line.ts";
+import { oneLine } from "../one-line.ts";
+import { scrubCredentials } from "../credential-scrub.ts";
 import { eventKey, project } from "./project.ts";
+
+/**
+ * A hit's text: one line, with its credential values redacted (credential-scrub.ts). Span records written before the
+ * scrub still carry what the summarizer copied, and an error line from such a record may carry one too.
+ */
+const sanitize = (text: string) => oneLine(scrubCredentials(text).text);
 
 export type RecallWhat = "span" | "commands" | "errors" | "decisions" | "dead-ends" | "corrections" | "message" | "files" | "all";
 

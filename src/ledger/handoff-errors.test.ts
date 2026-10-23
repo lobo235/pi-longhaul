@@ -136,3 +136,20 @@ test("errors: a signature carrying a credential is never recorded, new or carrie
     ["E3", "src/a.ts(12,5): error TS2322: Type 'string' is not assignable to type 'number'."],
   ]);
 });
+
+test("errors: a signature that names a credential before its value is recorded with the value redacted, new or carried (security.md T3)", () => {
+  const hex = "9f2c4e81b7a3d6f05e19c8a2b4d7e3f6a1c9b8e2d5f4a7c3b6e9d2f1a8c5b4e7";
+  const uuid = "3f7a2c91-5b4e-4d8a-9c1f-7e6b2a0d4c58";
+  const messages = [
+    ...bashCall("./seed-acl.sh", 1, `ops-control password (64-hex): ${hex}\nERR seeding failed`),
+    ...bashCall("./fetch-creds.sh", 2, `Error: secret db-creds version ${uuid} not found`),
+  ];
+  const { errors } = collectHandoff({ branchEntries: [], messages });
+  assert.ok(!JSON.stringify(errors).includes(hex) && !JSON.stringify(errors).includes(uuid), JSON.stringify(errors));
+  // The failure stays open: dropping it would let a state look clean while the build still fails.
+  assert.ok(errors.some((record) => record.signature.includes("Error: secret db-creds version <redacted> not found")), JSON.stringify(errors));
+
+  const carried: ErrorRecord[] = [{ id: "E7", signature: `ops-control password (64-hex): ${hex}`, resolved: true, lastSeenPass: 1 }];
+  const next = collectHandoff({ branchEntries: branchWith({ readFiles: [], modifiedFiles: [], commands: [], errors: carried }), messages: [] });
+  assert.deepEqual(next.errors.map((record) => [record.id, record.signature, record.resolved]), [["E7", "ops-control password (64-hex): <redacted>", true]]);
+});

@@ -51,3 +51,21 @@ test("recall: a correction shows as lifted exactly when the projection lifted it
   );
   assert.deepEqual(hits.map(([text, lifted]) => [text.slice(0, 7), lifted]), [["R1 [u2]", true], ["R1 [u1]", false], ["R2 [u1]", false]]);
 });
+
+test("recall: what a span record wrote with a credential in it comes back with the value redacted (security.md T3)", () => {
+  const hex = "9f2c4e81b7a3d6f05e19c8a2b4d7e3f6a1c9b8e2d5f4a7c3b6e9d2f1a8c5b4e7";
+  const events = [
+    ev({ kind: "decision.add", id: "D1", text: `seeded the ACL with password ${hex}` }),
+    ev({ kind: "deadEnd.add", id: "X1", text: "the token hvs.CAESIabcdefgh1234567 was read-only" }),
+    closeEvent(1, { narrative: `Probed AUTH with Bearer ${hex}.` }),
+  ];
+  const errors = [{ id: "E9", signature: `ops-control password (64-hex): ${hex}`, resolved: false, lastSeenPass: 1 }];
+  const deps: RecallDeps = { log: logOf(...events), ledger: { commands: [], errors }, messageText: () => undefined, caps: DEFAULT_CAPS };
+  const all = recall({ what: "all" }, deps).hits.map((hit) => hit.text).join("\n");
+  const one = recall({ what: "span", query: "1" }, deps).hits.map((hit) => hit.text).join("\n");
+  for (const text of [all, one]) {
+    assert.ok(!text.includes(hex) && !text.includes("hvs.CAES"), text);
+    assert.match(text, /password <redacted>/);
+  }
+  assert.equal(recall({ what: "decisions", query: hex.slice(0, 12) }, deps).total, 0, "a search for the value finds nothing");
+});

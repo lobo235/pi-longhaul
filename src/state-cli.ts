@@ -14,6 +14,7 @@ import { getAgentDir, type SessionEntry } from "@earendil-works/pi-coding-agent"
 import { previousLearnedValues } from "./carry.ts";
 import { readConfigFile, resolveStateConfig } from "./config.ts";
 import { render, stripControls } from "./render.ts";
+import { scrubCredentials } from "./credential-scrub.ts";
 import { pathTo, readTranscript } from "./score/candidates.ts";
 import { project, projectAt } from "./store/project.ts";
 import { buildToolContext } from "./tool-context.ts";
@@ -66,7 +67,7 @@ function spanLines(context: ReturnType<typeof buildToolContext>): string[] {
   return context.log.spans.map((summary) => {
     const record = summary.record;
     const close = record?.events.find((event) => event.kind === "span.close");
-    const narrative = close && close.kind === "span.close" ? (close.narrativeLess ? "narrative-less" : `narrative: ${close.narrative ?? ""}`) : "no record";
+    const narrative = close && close.kind === "span.close" ? (close.narrativeLess ? "narrative-less" : `narrative: ${scrubCredentials(close.narrative ?? "").text}`) : "no record";
     return `span ${summary.span}: entry ${summary.compactionEntryId ?? "?"}, ${record?.events.length ?? 0} events, ${record?.ledger.commands.length ?? 0} commands, ${record?.ledger.errors.length ?? 0} errors, ${summary.foreign ? `foreign (${summary.foreign})` : narrative}`;
   });
 }

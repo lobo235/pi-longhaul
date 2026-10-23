@@ -21,12 +21,14 @@ import { shouldAttemptRoute, type RouteHealthState } from "./narrative/route-hea
 import { resolveSummarizationModel, type ModelLookup, type ResolvedSummarizationModel } from "./narrative/routing.ts";
 import { routeProvidersFor, type ResolvedSummarizationRoute } from "./narrative/route-config.ts";
 import { turnTextsOf, type SpanTexts } from "./narrative/named-values.ts";
+import { spanCredentials } from "./span-credentials.ts";
 import { runNarrativeCall, type NarrativeInput } from "./narrative/run.ts";
 import { TURNS_PROMPT_REVISION } from "./narrative/turns/conversation.ts";
 import { runSectionTurns, type TurnsContext } from "./narrative/turns/run.ts";
 import type { NarrativeOutcome } from "./narrative/types.ts";
 import type { WarmBase } from "./narrative/warm.ts";
 import { render } from "./render.ts";
+import { scrubModelWritten } from "./credential-scrub.ts";
 import type { RunningTask } from "./tasks.ts";
 import type { CapFitResult } from "./store/capfit.ts";
 import { closeSpan, type ClosedSpan } from "./store/close.ts";
@@ -123,6 +125,8 @@ interface Closed {
   ledger: { commands: CommandRecord[]; errors: ErrorRecord[] };
   files: ReturnType<typeof carryFileOps>;
   learned: LearnedValue[];
+  /** Credential values taken out of what the summarizer wrote (credential-scrub.ts); a count, never the values. */
+  redacted: number;
 }
 
 function resolveRoute(input: PassInput, config: StateConfig, deps: PassDeps): { route: ResolvedSummarizationRoute; resolved?: ResolvedSummarizationModel; routeAvailable: boolean } {
@@ -326,30 +330,44 @@ async function callNarrative(input: PassInput, fold: Fold, config: StateConfig, 
   return runSectionTurns({ ...narrativeInputOf(input, fold, config, deps, at, state), turns: config.narrativeTurns, context }, narrativeDeps);
 }
 
+/**
+ * Every message the summarizer was shown, as far as credentials go: the span, the previous summary, a switchover's
+ * earlier user messages, and in warm mode the session's own last request.
+ */
+function summarizerSaw(input: PassInput, fold: Fold, config: StateConfig, spanMessages: AgentMessage[]): AgentMessage[] {
+  const texts = [input.preparation.previousSummary, ...(fold.seed.seedRules ?? []).map((rule) => rule.text), ...(fold.seed.seedContext ?? []).map((message) => message.text)];
+  const shown = texts.filter((text): text is string => Boolean(text)).map((text) => ({ role: "custom", content: text, timestamp: 0 }) as unknown as AgentMessage);
+  const warm = config.narrativeMode === "warm" ? (input.warmBase?.messages ?? []) as unknown as AgentMessage[] : [];
+  return [...spanMessages, ...shown, ...warm];
+}
+
 async function closeAndRender(input: PassInput, fold: Fold, outcome: NarrativeOutcome, config: StateConfig, at: string): Promise<Closed> {
   const { preparation, branchEntries } = input;
   const { capture, snapshot, ledger, objectiveEvents, world, files } = await fold.settled();
-  const modelEvents = [...objectiveEvents.map((event) => ({ ...event, seq: 0 })), ...outcome.events];
+  const spanMessages = [...preparation.messagesToSummarize, ...(preparation.turnPrefixMessages ?? [])];
+  // Before anything is recorded: a credential the summarizer was shown must not reach the span record, nor every later request.
+  const scrubbed = scrubModelWritten(outcome.events, outcome.narrative, spanCredentials(summarizerSaw(input, fold, config, spanMessages)));
+  const modelEvents = [...objectiveEvents.map((event) => ({ ...event, seq: 0 })), ...scrubbed.events];
   const diffEvents = [...modelEvents, ...seedRuleEvents(fold, outcome, modelEvents, config, at)];
   // Ids from the whole merged ledger, not the fitted slice: a value's source must not vanish with a low-ranked record.
   // The values the summarizer named come first: each was checked against its turn, and its name says what it is.
-  const picked = learnedValues([...preparation.messagesToSummarize, ...(preparation.turnPrefixMessages ?? [])], fold.handoff.commands);
+  const picked = learnedValues(spanMessages, fold.handoff.commands);
   const learned = carryLearnedValues(previousLearnedValues(branchEntries), [...(outcome.values ?? []), ...picked]);
   const tasks = (await fold.tasks) ?? [];
   const measure = (candidate: SessionState) => render({ state: candidate, tokensBefore: preparation.tokensBefore, ledger, snapshot, caps: config.caps, files, learned, tasks, compactedAt: at }).length;
-  const closed = closeSpan({ log: fold.log, caps: config.caps, diffEvents: renumber(diffEvents, fold.log.nextSeq), close: { fromRef: fold.spanInput.fromRef, toRef: fold.spanInput.toRef, narrative: outcome.narrative, narrativeLess: outcome.kind === "narrative-less", world, ...(outcome.missingChunks.length ? { missingChunks: outcome.missingChunks } : {}) }, at, measure });
-  return { closed, summary: render({ state: closed.state, tokensBefore: preparation.tokensBefore, ledger, snapshot, caps: config.caps, files, learned, tasks, compactedAt: at }), capture, snapshot, ledger, files, learned };
+  const closed = closeSpan({ log: fold.log, caps: config.caps, diffEvents: renumber(diffEvents, fold.log.nextSeq), close: { fromRef: fold.spanInput.fromRef, toRef: fold.spanInput.toRef, narrative: scrubbed.narrative, narrativeLess: outcome.kind === "narrative-less", world, ...(outcome.missingChunks.length ? { missingChunks: outcome.missingChunks } : {}) }, at, measure });
+  return { closed, summary: render({ state: closed.state, tokensBefore: preparation.tokensBefore, ledger, snapshot, caps: config.caps, files, learned, tasks, compactedAt: at }), capture, snapshot, ledger, files, learned, redacted: scrubbed.redacted };
 }
 
 function assembleResult(input: PassInput, config: StateConfig, fold: Fold, outcome: NarrativeOutcome, built: Closed, deps: PassDeps, startedAt: Date, at: string): PassResult {
   const { preparation } = input;
-  const { closed, summary, capture, snapshot, ledger, files, learned } = built;
+  const { closed, summary, capture, snapshot, ledger, files, learned, redacted } = built;
   const usage = { input: outcome.usage.input, output: outcome.usage.output, calls: outcome.usage.calls };
   const details: StateDetails = { compactor: "state", stateFormat: STATE_FORMAT, promptRevision: outcome.sections ? TURNS_PROMPT_REVISION : NARRATIVE_PROMPT_REVISION, state: closed.state, caps: config.caps, ledger, snapshot, narrative: narrativeTraceOf(outcome), readFiles: files.readFiles, modifiedFiles: files.modifiedFiles, learnedValues: learned };
   const pending: PendingSpan = { span: fold.span, events: closed.log.events.filter((event) => event.span === fold.span), ledger, snapshot, usage, caps: config.coldSliceCaps };
   const route = { spec: fold.route.spec, rule: fold.route.rule, model: fold.resolved ? `${fold.resolved.model.provider}/${fold.resolved.model.id}` : undefined, fallbackReason: fold.resolved?.fallbackReason, routeIgnored: fold.resolved?.routeIgnored, routeAvailable: fold.routeAvailable };
   const logOptions = logOptionsOf(input.env);
-  const log = { event: "compaction", at, reason: input.reason, span: fold.span, tokensBefore: preparation.tokensBefore, summaryChars: summary.length, narrative: logSafeNarrative(details.narrative, logOptions), rejected: logSafeRejected(outcome.rejected, logOptions), route, routeHealth: outcome.routeHealth, capFit: closed.capFit.retired, capExhausted: closed.capFit.exhausted, anomalies: fold.log.anomalies, world: { claims: closed.state.world?.claims.length ?? 0, openErrors: closed.state.world?.openErrorIds.length ?? 0, dirty: closed.state.world?.dirty }, carried: { readFiles: files.readFiles.length, modifiedFiles: files.modifiedFiles.length, removed: logSafeRemoved(files.removed, logOptions), learnedValues: learned.length }, workspace: "skipped" in capture ? { skipped: logSafeSkipped(capture.skipped, logOptions) } : { captured: true }, durationMs: deps.now().getTime() - startedAt.getTime() };
+  const log = { event: "compaction", at, reason: input.reason, span: fold.span, tokensBefore: preparation.tokensBefore, summaryChars: summary.length, narrative: logSafeNarrative(details.narrative, logOptions), rejected: logSafeRejected(outcome.rejected, logOptions), route, routeHealth: outcome.routeHealth, capFit: closed.capFit.retired, capExhausted: closed.capFit.exhausted, anomalies: fold.log.anomalies, world: { claims: closed.state.world?.claims.length ?? 0, openErrors: closed.state.world?.openErrorIds.length ?? 0, dirty: closed.state.world?.dirty }, carried: { readFiles: files.readFiles.length, modifiedFiles: files.modifiedFiles.length, removed: logSafeRemoved(files.removed, logOptions), learnedValues: learned.length }, redacted, workspace: "skipped" in capture ? { skipped: logSafeSkipped(capture.skipped, logOptions) } : { captured: true }, durationMs: deps.now().getTime() - startedAt.getTime() };
   return {
     compaction: { summary, firstKeptEntryId: preparation.firstKeptEntryId, tokensBefore: preparation.tokensBefore, usage: compactionUsageOf(outcome.usage), details },
     pending, outcome, routeHealth: outcome.routeHealth, route, capFit: closed.capFit, anomalies: fold.log.anomalies, notice: noticeOf(fold.span, outcome, summary.length), log,
