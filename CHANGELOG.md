@@ -8,6 +8,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-10-23
+
 ### Changed
 
 - Standing rules no longer retire by count. Only the newest 8 corrections used to stay, so a long session lost its
