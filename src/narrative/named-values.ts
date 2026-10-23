@@ -45,7 +45,7 @@ function textsIn(message: Rec): string[] {
 }
 
 /** Everything a message carries as text, call arguments string by string (so a written file is read line by line). */
-function everyTextIn(message: Rec): string[] {
+export function everyTextIn(message: Rec): string[] {
   const out: string[] = [];
   if (typeof message.content === "string") out.push(message.content);
   if (Array.isArray(message.content)) {
@@ -90,6 +90,18 @@ export interface SpanTexts {
 }
 
 /**
+ * Every token that stood on a credential line, after a credential named in prose, in a `user:pass@` login or in a
+ * secret store's output anywhere in `messages`: what a value is refused for. Broad on purpose, since refusing a value
+ * costs little; the credential scrub uses the stricter span-credentials.ts, as it takes each one out everywhere.
+ */
+function credentialTokensIn(messages: readonly AgentMessage[]): Set<string> {
+  const tainted = new Set<string>();
+  for (const message of messages as unknown as Rec[]) for (const text of everyTextIn(message)) for (const token of credentialTokensOf(text)) tainted.add(token);
+  for (const output of secretStoreOutputs(messages as unknown as Rec[])) for (const token of tokensOf(output)) tainted.add(token);
+  return tainted;
+}
+
+/**
  * Each turn's text, by the ordinal tag prepare.ts puts on its user message (thinking was stripped before), and the
  * span's credential tokens. Those are taken from every message, sources or not: a password a web page showed is no
  * more a value than one the user typed.
@@ -110,14 +122,12 @@ export function spanTextsOf(messages: AgentMessage[]): SpanTexts {
  */
 export function turnTextsOf(messages: ReadonlyArray<{ ordinal?: string; message: AgentMessage; taintOnly?: boolean }>): SpanTexts {
   const turns = new Map<string, string[]>();
-  const tainted = new Set<string>();
   let current: string[] | undefined;
   for (const { ordinal, message, taintOnly } of messages as unknown as ReadonlyArray<{ ordinal?: string; message: Rec; taintOnly?: boolean }>) {
-    for (const text of everyTextIn(message)) for (const token of credentialTokensOf(text)) tainted.add(token);
     if (ordinal) turns.set(ordinal, (current = []));
     if (!taintOnly) current?.push(...textsIn(message));
   }
-  for (const output of secretStoreOutputs(messages.map((entry) => entry.message) as unknown as Rec[])) for (const token of tokensOf(output)) tainted.add(token);
+  const tainted = credentialTokensIn(messages.map((entry) => entry.message));
   const joined = new Map([...turns].map(([ordinal, texts]) => [ordinal, texts.join("\n")]));
   // Each turn's clean text once, newest first: a value that misses is looked up again on every attempt.
   let clean: Array<[string, string]> | undefined;

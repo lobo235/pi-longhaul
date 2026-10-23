@@ -29,6 +29,22 @@ export function messagesSinceLastCompaction(branch: SessionEntry[]): AgentMessag
   return branch.slice(start).filter((entry) => entry.type === "message").map((entry) => (entry as { message: AgentMessage }).message);
 }
 
+/**
+ * The messages still in the model's context: from the latest compaction's first kept entry (the kept window), else
+ * from the start of the branch. What a remember write is checked against (remember-tool.ts).
+ */
+export function messagesInContext(branch: SessionEntry[]): AgentMessage[] {
+  let start = 0;
+  for (let index = branch.length - 1; index >= 0; index--) {
+    const entry = branch[index];
+    if (entry.type !== "compaction") continue;
+    const kept = branch.findIndex((candidate) => candidate.id === entry.firstKeptEntryId);
+    start = kept >= 0 && kept < index ? kept : index + 1;
+    break;
+  }
+  return branch.slice(start).filter((entry) => entry.type === "message").map((entry) => (entry as { message: AgentMessage }).message);
+}
+
 /** The live ledger alone, for a caller that needs no index, log or files (recall what=output). */
 export function liveLedger(branch: SessionEntry[]): ToolContext["ledger"] {
   const handoff = collectHandoff({ branchEntries: branch, messages: messagesSinceLastCompaction(branch) });

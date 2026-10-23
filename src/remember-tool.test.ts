@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { proposalOf, registerRememberTool, REMEMBER_KINDS } from "./remember-tool.ts";
 import { EVENT_ENTRY_TYPE } from "./store/events.ts";
-import { assistantEntry, chain, fakeCtx, fakePi, userEntry } from "./test-support.ts";
+import { assistantEntry, chain, compactionEntry, fakeCtx, fakePi, toolResultEntry, userEntry } from "./test-support.ts";
 
 const now = () => new Date("2026-09-28T12:00:00.000Z");
 
@@ -60,4 +60,45 @@ test("remember tool: the repaired-argument note prefixes the answer; a malformed
   const malformed = await exec(tool, { kind: "lift" }, ctx);
   assert.match(malformed.content[0].text, /^not remembered: lift needs `target`/);
   assert.equal(malformed.details.ok, false);
+});
+
+test("remember tool: a decision or dead end carrying a credential value is refused, naming the rule, and nothing is appended (security.md T3)", async () => {
+  const { pi, tools, entries } = fakePi();
+  registerRememberTool(pi, { readConfig: () => undefined, now });
+  const tool = tools.find((candidate) => candidate.name === "longhaul_remember")!;
+  const branch = chain([
+    userEntry("m1", "Run the migration against the app database"),
+    assistantEntry("a1", "reading the env", [{ name: "bash", arguments: { command: "cat deploy/app.env" } }]),
+    toolResultEntry("t1", "a1-t0", "bash", "DB_HOST=db1\nDB_PASSWORD=Summerwind"),
+    assistantEntry("a2", "done"),
+  ]);
+  const { ctx } = fakeCtx({ branch });
+  const cases: Array<[name: string, params: Record<string, unknown>]> = [
+    ["a value the span showed on a credential line", { kind: "decision", text: "log in to db1 with Summerwind for the migration", evidence: "C1" }],
+    ["a credential shape", { kind: "dead-end", text: "the token hvs.CAESIabcdefgh1234567 was read-only" }],
+  ];
+  for (const [name, params] of cases) {
+    const result = await exec(tool, params, ctx);
+    assert.match(result.content[0].text, /^not remembered: .*credential's value/, name);
+    assert.equal(result.details.ok, false, name);
+  }
+  assert.equal(entries.length, 0);
+  const kept = await exec(tool, { kind: "decision", text: "read the migration login from the app env file", evidence: "C1" }, ctx);
+  assert.equal(kept.details.ok, true);
+});
+
+test("remember tool: a credential read in the window a compaction kept is refused too (R-004)", async () => {
+  const { pi, tools, entries } = fakePi();
+  registerRememberTool(pi, { readConfig: () => undefined, now });
+  const tool = tools.find((candidate) => candidate.name === "longhaul_remember")!;
+  const kept = [
+    userEntry("m1", "Run the migration against the app database"),
+    assistantEntry("a1", "reading the env", [{ name: "bash", arguments: { command: "cat deploy/app.env" } }]),
+    toolResultEntry("t1", "a1-t0", "bash", "DB_PASSWORD=Summerwind7"),
+  ];
+  const compaction = { ...compactionEntry("c1", undefined), firstKeptEntryId: "m1" } as typeof kept[number];
+  const { ctx } = fakeCtx({ branch: chain([...kept, compaction, assistantEntry("a2", "compacted")]) });
+  const result = await exec(tool, { kind: "decision", text: "use Summerwind7 for the migration", evidence: "C1" }, ctx);
+  assert.match(result.content[0].text, /^not remembered: .*credential's value/);
+  assert.equal(entries.length, 0);
 });

@@ -74,6 +74,8 @@ const SECRET_PATTERNS: RegExp[] = [
   /\bAGE-SECRET-KEY-1[0-9A-Z]{20,}/,
   /\bAKIA[0-9A-Z]{16}\b/,
   /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,})/,
+  // As credential-scrub.ts CREDENTIAL_SHAPES: GitLab, Google API, Stripe, npm and Hugging Face tokens.
+  /\b(?:glpat-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|[sr]k_(?:live|test)_[A-Za-z0-9]{16,}|npm_[A-Za-z0-9]{36}|hf_[A-Za-z]{30,})/,
 ];
 
 /** Whether `text` (a command, or a tool result's failure signature) carries a credential shape. */

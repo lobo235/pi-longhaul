@@ -8,6 +8,36 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+### Fixed
+
+- The summarizer copied credentials into the state it wrote: a password from a script's output into Resume, an API
+  key or Bearer value into Now, decisions and the narrative. The state is sent with every later request, so the
+  value went out again at every turn, and states on real sessions held live ones. What the summarizer writes is now
+  scrubbed before it is recorded: each credential value becomes `<redacted>` and the rest of the line stays. A value
+  is one when the span showed it as a credential (a credential key's value, symbols and all, a command's password
+  argument, a value a secret store printed, `the password is …`), wherever the summarizer put it and however it
+  wrapped it; when the text names it
+  (`password=…`, `"api_key": "…"`, `Bearer …`, a `user:pass@` login, or a random-looking value just after a
+  credential word, so `password (64-hex): <hex>` and `the gateway key (<uuid>)`); or when its shape is one wherever
+  it stands (a JWT, a Vault token, AWS, GitHub, OpenAI-style, Slack and age keys). The span's credentials include
+  what the previous summary and a switchover's earlier messages showed. A digest (`sha256:…`) is never one, and
+  neither is a path, a count, a version or a date the text gives a key, nor, among the span's credentials, a name
+  (`app-token`) under a token or secret key, an id or hash its label names (`Evaluation ID:`, `plan_hash`,
+  `commit`), the rest of a command after a key whose value it computes (`TOKEN=$(vault kv get … | python3 …)`), a test
+  name after `--- PASS:`, or a value after a credential word that is part of a file name (`~/.vault-token`): on real
+  sessions the scrub took out the credentials and left versions, hashes, ids and names alone. A state written before this shows redacted from its session's next compaction
+  on (the summary, the summarizer's prompt, `longhaul_recall`, `npm run state`), by every rule but the span's own
+  credentials, which only the pass that wrote it had. Until then pi keeps sending the summary it stored, and a
+  transcript keeps every summary and record it already holds, so a credential found in a state must be rotated. The compaction log records how many values a pass redacted
+  (`redacted`), never the values. Both summarizer prompts also tell the model never to copy a credential's value
+  and to say where it lives instead, and `longhaul_remember` refuses a decision or dead end that carries one.
+- An error line naming a credential before its value (`ops-control password (64-hex): <value>`) was recorded as an
+  open error and shown in every state; no command-style shape matched it. Such a line is now recorded with the value
+  redacted, so the failure stays open, and one already carried is redacted at the next compaction.
+- The credential rules found too little: a password key glued to its prefix (`PGPASSWORD=`, `MYSQL_PWD=`), short
+  keys (`pw=`, `pass=`), `Authorization: Basic`, a private key's body past its first line, and GitLab, Google API,
+  Stripe, npm and Hugging Face tokens, now in both the scrub and the command ledger's credential shapes.
+
 ## [v1.0.3] - 2026-10-22
 
 ### Changed

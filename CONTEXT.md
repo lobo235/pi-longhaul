@@ -76,6 +76,12 @@ Values a later turn may need again, verbatim, with where each came from: those t
 that the session used again (a hash, a version, a long number).
 _Avoid_: facts (the scorer's measure of a related but different set)
 
+**Credential scrub**:
+Taking each credential value out of the text the summarizer writes into the state (the narrative, Now,
+decisions, dead ends), leaving `<redacted>` and the words around it. The value is gone; what it was and where it
+lives can stay.
+_Avoid_: sanitize (one-line.ts: control characters and newlines), redact (the ledger's word for dropping a whole command)
+
 ## Configuration
 
 **Agent dir**:

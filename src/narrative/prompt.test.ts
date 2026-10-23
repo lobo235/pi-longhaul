@@ -76,7 +76,7 @@ test("renderNarrativePrompt: system prompt first (cacheable), then state, ordina
   assert.ok(text.trimEnd().endsWith("</retry-note>"));
   assert.match(NARRATIVE_SYSTEM_PROMPT, /```json/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /"messageRef"/);
-  assert.equal(NARRATIVE_PROMPT_REVISION, "state-16");
+  assert.equal(NARRATIVE_PROMPT_REVISION, "state-17");
 });
 
 test("NARRATIVE_SYSTEM_PROMPT: every user message of the span is labeled, in every form the parser reads, whatever words it uses", () => {
@@ -150,4 +150,10 @@ test("renderNarrativePrompt: the earlier rules say the code records them and tha
 test("NARRATIVE_SYSTEM_PROMPT: a file-name format the user chose is a value, placeholders and all", () => {
   assert.match(NARRATIVE_SYSTEM_PROMPT, /a file-name format the user chose \("<name>-YYYYMMDD\.tar\.gz"\)/);
   assert.match(NARRATIVE_SYSTEM_PROMPT, /with <placeholders> if the format has them/);
+});
+
+test("promptStateOf: a remembered decision with a credential in it reaches the summarizer redacted (security.md T3)", () => {
+  const log = logOf(ev({ kind: "decision.add", id: "D1", text: "call it with Bearer 3f7a2c91-5b4e-4d8a-9c1f-7e6b2a0d4c58", source: "remember" }));
+  const state = promptStateOf(project(log, DEFAULT_CAPS), log.events);
+  assert.deepEqual(state.remembered, [{ kind: "decision", text: "D1 call it with Bearer <redacted>" }]);
 });

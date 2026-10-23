@@ -2,17 +2,21 @@
  * The `remember` tool: one verified write into the Session state, sequential so two calls in one
  * turn never race the fold. Quotes only, resolved newest-first; the store's commitRemember is the
  * whole policy. Argument repair: a quote passed as `text` (or the reverse) is swapped with a Note,
- * because a model that got the field wrong got the intent right.
+ * because a model that got the field wrong got the intent right. A decision or dead end is the
+ * model's own words, so one that carries a credential value (credential-scrub.ts, with the
+ * credentials of the messages still in context, the kept window included) is refused, never stored (security.md T3).
  */
 import { REMEMBER_TOOL } from "./tool-names.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 import { readConfigFile, resolveStateConfig, type ReadFileFn } from "./config.ts";
+import { CREDENTIAL_RULE, scrubCredentials } from "./credential-scrub.ts";
+import { spanCredentials } from "./span-credentials.ts";
 import { commitRemember } from "./store/commit.ts";
 import { EVENT_ENTRY_TYPE, type PersistedEvent } from "./store/events.ts";
 import type { Proposal } from "./store/verify.ts";
-import { buildToolContext } from "./tool-context.ts";
+import { buildToolContext, messagesInContext } from "./tool-context.ts";
 import { formatRemember } from "./tool-text.ts";
 
 export const REMEMBER_KINDS = ["correction", "lift", "decision", "dead-end", "done-when"] as const;
@@ -42,6 +46,13 @@ export function proposalOf(params: RememberParams): { proposal: Proposal; note?:
   return { proposal: { kind: "dead-end", text: words, evidence: params.evidence }, note };
 }
 
+/** Why a decision or dead end is refused, or undefined: the model's own words may not hold a credential the span showed or one shaped as one. */
+function credentialRefusal(proposal: Proposal, branch: Parameters<typeof messagesInContext>[0]): string | undefined {
+  if (proposal.kind !== "decision" && proposal.kind !== "dead-end") return undefined;
+  if (scrubCredentials(proposal.text, spanCredentials(messagesInContext(branch))).redacted === 0) return undefined;
+  return `the text carries a credential. ${CREDENTIAL_RULE}`;
+}
+
 const PARAMETERS = Type.Object({
   kind: Type.Union(REMEMBER_KINDS.map((kind) => Type.Literal(kind)), { description: "correction: a standing rule the user gave (quote). lift: the user withdrew a correction (target + quote). decision / dead-end: your own one sentence (text, evidence). done-when: the user's acceptance words (quote)." }),
   quote: Type.Optional(Type.String({ description: "The user's exact words, a substring of one user message (12+ chars). Example: \"never use mocks in these tests\"." })),
@@ -64,8 +75,11 @@ export function registerRememberTool(pi: ExtensionAPI, deps: { readConfig: ReadF
     async execute(_toolCallId, params, _signal, _onUpdate, ctx: ExtensionContext) {
       const mapped = proposalOf(params as RememberParams);
       if ("error" in mapped) return { content: [{ type: "text", text: `not remembered: ${mapped.error}` }], details: { ok: false, remaining: undefined, rejection: { code: "schema", detail: mapped.error } } };
+      const branch = ctx.sessionManager.getBranch();
+      const refusal = credentialRefusal(mapped.proposal, branch);
+      if (refusal) return { content: [{ type: "text", text: `not remembered: ${refusal}` }], details: { ok: false, remaining: undefined, rejection: { code: "credential", detail: refusal } } };
       const config = resolveStateConfig(deps.readConfig);
-      const context = buildToolContext(ctx.sessionManager.getBranch());
+      const context = buildToolContext(branch);
       const outcome = commitRemember(mapped.proposal, {
         log: context.log, resolver: context.index, caps: config.caps, nearDuplicateThreshold: config.nearDuplicateThreshold, rememberCap: config.rememberPerSpan,
         now: () => deps.now().toISOString(), appendEntry: (customType: string, data: PersistedEvent) => pi.appendEntry(customType, data),

@@ -8,6 +8,7 @@
 import type { Caps, ForeignCompactor, Now, Quote, Source, StateEvent, StateLog, World } from "./events.ts";
 import { DEFAULT_NEAR_DUPLICATE_THRESHOLD, overlap, tokenize } from "./near-duplicate.ts";
 import { oneLine } from "../one-line.ts";
+import { scrubCredentials } from "../credential-scrub.ts";
 
 export interface CorrectionItem {
   id: string;
@@ -69,6 +70,14 @@ export function emptyState(): SessionState {
 
 const idNumber = (id: string) => Number(/^[RDX](\d+)$/.exec(id)?.[1] ?? 0);
 
+/**
+ * Model-written text as the state shows it: with its credential values redacted (credential-scrub.ts). A pass scrubs
+ * what it writes against the span's own credentials; this catches what a record written before that carries, by
+ * shape and by what the text itself names, wherever the state is read (render, prompt, recall, the state CLI).
+ */
+const clean = (text: string) => scrubCredentials(text).text;
+const cleanNow = (now: Now): Now => ({ inProgress: now.inProgress.map(clean), next: now.next.map(clean), blocked: now.blocked.map(clean), resume: clean(now.resume) });
+
 /** Retire the oldest active items of a kind past the cap; returns how many retired. */
 function retireOverCap<T extends { retired: boolean; seq: number }>(items: T[], cap: number): number {
   let excess = items.filter((item) => !item.retired).length - cap;
@@ -88,7 +97,7 @@ function workLogText(event: Extract<StateEvent, { kind: "span.close" }>): string
   if (event.foreign) return `compacted by ${event.foreign === "pi" ? "pi's own summarizer" : "another extension's compactor"}; no state diff for this span`;
   const missing = event.missingChunks?.length ? ` (chunk ${event.missingChunks.join(", ")} of this span did not verify)` : "";
   if (event.narrativeLess || !event.narrative) return `narrative unavailable for this span (narrative-less pass)${missing}`;
-  return `${event.narrative}${missing}`;
+  return `${clean(event.narrative)}${missing}`;
 }
 
 /** Fold the two oldest work-log lines into one consolidated line until the active count fits the cap. */
@@ -210,17 +219,17 @@ function applyInPlace(state: SessionState, event: StateEvent, caps: Caps): void 
       break;
     }
     case "decision.add":
-      state.decisions.push({ id: event.id, text: event.text, span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false });
+      state.decisions.push({ id: event.id, text: clean(event.text), span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false });
       state.cursor.D = Math.max(state.cursor.D, idNumber(event.id));
       state.retired.decisions += retireOverCap(state.decisions, caps.decisions);
       break;
     case "deadEnd.add":
-      state.deadEnds.push({ id: event.id, text: event.text, span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false });
+      state.deadEnds.push({ id: event.id, text: clean(event.text), span: event.span, source: event.source, evidence: event.evidence, seq: event.seq, retired: false });
       state.cursor.X = Math.max(state.cursor.X, idNumber(event.id));
       state.retired.deadEnds += retireOverCap(state.deadEnds, caps.deadEnds);
       break;
     case "now.set":
-      state.now = { ...event.now, span: event.span, carried: false };
+      state.now = { ...cleanNow(event.now), span: event.span, carried: false };
       break;
     case "span.close":
       applyClose(state, event, caps);

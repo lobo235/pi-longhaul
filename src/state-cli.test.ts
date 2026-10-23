@@ -117,3 +117,10 @@ test("runStateCli --json: a rule's former ids print as a list, not as an empty o
   runStateCli({ file, json: true, spans: false, anomalies: false }, (text) => json.push(text));
   assert.deepEqual(JSON.parse(json.join("")).corrections.map((item: { id: string; formerIds?: unknown }) => [item.id, item.formerIds]), [["R2", ["R1"]]]);
 });
+
+test("state CLI --spans: a span record's narrative prints with its credential values redacted (security.md T3)", () => {
+  const { file } = transcript("2026-09-28T10-00-00_cred.jsonl", { narrative: "probed with the token hvs.CAESIabcdefgh1234567" });
+  const spans: string[] = [];
+  runStateCli({ file, json: false, spans: true, anomalies: false }, (text) => spans.push(text));
+  assert.match(spans.join(""), /narrative: probed with the token <redacted>/);
+});
