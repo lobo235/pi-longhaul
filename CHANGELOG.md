@@ -8,7 +8,15 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
-## [v1.1.0] - 2026-10-23
+## [v1.1.1] - 2026-10-23
+
+### Fixed
+
+- v1.1.0 was tagged but never published: its release stopped before npm because the package's gallery image still
+  named the previous release. v1.1.1 is the first published release with the v1.1.0 changes below (standing rules
+  kept until withdrawn, the `/skill:` text no longer quotable as yours, the summarizer's tighter rule wording).
+
+## [v1.1.0] - 2026-10-23 [not published]
 
 ### Changed
 
