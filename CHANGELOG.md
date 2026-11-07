@@ -8,6 +8,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026-11-07
+
 ### Added
 
 - An answered `ask_user_question` is recorded as a decision the moment it lands, numbered `q1`, `q2`, ... in branch
