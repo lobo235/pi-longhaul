@@ -9,7 +9,7 @@ import { renderFilesSection } from "./files-render.ts";
 import { oneLine } from "./one-line.ts";
 import { renderLearnedSection, type LearnedValue } from "./learned.ts";
 import type { Caps, Quote } from "./store/events.ts";
-import { activeCorrections, activeDeadEnds, activeDecisions, activeWorkLog, GOAL_SOURCE_LABEL, goalLine, type SessionState, type TextItem } from "./store/project.ts";
+import { activeCorrections, activeDeadEnds, activeDecisions, activeWorkLog, GOAL_SOURCE_LABEL, goalLine, type SessionState, type TextItem, type WorkLogLine } from "./store/project.ts";
 import { renderTaskLine, type RunningTask } from "./tasks.ts";
 import { evaluateDoneGate, renderDoneGate, renderWorldLines } from "./world-render.ts";
 
@@ -132,8 +132,27 @@ function learnedSection({ learned, caps }: RenderInput): string[] {
   return learned ? renderLearnedSection(learned, caps.learnedChars) : [];
 }
 
+/**
+ * How much of one span's line the work log shows. A line is a span's own narrative, and a summarizer asked for "one line
+ * per span" writes far more than a line when nothing bounds it: real sessions carried lines of ~1,800 characters, so the
+ * section cost 20k characters at 12 spans and the hard cap retired every line of it. 300 characters is the length the
+ * README example and the state's own framing assume ("one line per span; detail via longhaul_recall"); the cut names
+ * the span to recall.
+ */
+export const WORKLOG_LINE_CHARS = 300;
+
+function workLogLine(line: WorkLogLine): string {
+  const text = oneLine(line.text);
+  const shown = text.length <= WORKLOG_LINE_CHARS ? text : `${text.slice(0, WORKLOG_LINE_CHARS - 1).trimEnd()}… (${RECALL_TOOL} span ${line.span})`;
+  if (line.retiredSpans) return `- ${shown}`;
+  // A span with no user message of its own (a restart, a carried tail) has no ordinals to point at: "[?–?]" is noise on
+  // every such line, and the span number already says where the detail is.
+  const refs = `${oneLine(line.fromRef)}–${oneLine(line.toRef)}`;
+  return `${line.span}.${refs === "?–?" ? "" : ` [${refs}]`} ${shown}`;
+}
+
 function workLogSection({ state }: RenderInput): string[] {
-  const lines = activeWorkLog(state).map((line) => (line.retiredSpans ? `- ${line.text}` : `${line.span}. [${oneLine(line.fromRef)}–${oneLine(line.toRef)}] ${oneLine(line.text)}`));
+  const lines = activeWorkLog(state).map(workLogLine);
   return [`## Work log (one line per span; detail via ${RECALL_TOOL}${retiredNote(state.retired.workLog)})`, ...(lines.length ? lines : ["(no spans closed yet)"])];
 }
 

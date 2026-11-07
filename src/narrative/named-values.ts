@@ -107,12 +107,15 @@ function credentialTokensIn(messages: readonly AgentMessage[]): Set<string> {
  * more a value than one the user typed.
  */
 export function spanTextsOf(messages: AgentMessage[]): SpanTexts {
-  // A wrong pointer inside the span is the model's to fix (a retry names the turn); only earlier turns resolve one.
-  const { holderOf: _earlierOnly, ...span } = turnTextsOf((messages as unknown as Rec[]).map((message) => {
+  // A wrong pointer inside the span is repaired at the turn that really holds the value: the model sees the whole span
+  // tagged, but it still miscites turns often enough that dropping the value was the commonest loss of a real week
+  // (43 of 109 rejected fields), and the value itself was verified verbatim in ANOTHER turn of the same span. The
+  // repair is not weaker than the original check: checkAt re-runs every test (shape, name, credential lines, taint) on
+  // the holder turn before the value is kept.
+  return turnTextsOf((messages as unknown as Rec[]).map((message) => {
     const tag = message.role === "user" ? /^\[(u\d+)\] /.exec(textsIn(message)[0] ?? "")?.[1] : undefined;
     return { message: message as unknown as AgentMessage, ...(tag ? { ordinal: tag } : {}) };
   }));
-  return span;
 }
 
 /**

@@ -22,6 +22,23 @@ test("checkNamedValues: a value not in the cited turn is a fixable error naming 
   assert.deepEqual(checked.errors.map((error) => [error.path, error.rejection.code, error.fixable]), [["values[0]", "value-not-in-turn", true], ["values[1]", "unknown-ref", false]]);
 });
 
+test("spanTextsOf + checkNamedValues: a value the model cited in the wrong turn of the same span is kept, sourced at the turn that really holds it", () => {
+  // The commonest loss in a real week (43 of 109 rejected fields): the value is verified verbatim in another turn.
+  const messages = [
+    { role: "user", content: "[u1] Run the benchmark." },
+    { role: "assistant", content: [{ type: "text", text: "Ran it." }] },
+    { role: "toolResult", toolCallId: "t1", toolName: "bash", content: [{ type: "text", text: "166 ms" }] },
+    { role: "user", content: "[u2] Now the deploy." },
+    { role: "toolResult", toolCallId: "t2", toolName: "bash", content: [{ type: "text", text: "port 8090 open" }] },
+  ];
+  const span = spanTextsOf(messages as never);
+  const checked = checkNamedValues([{ name: "the benchmark time", value: "166 ms", ref: "u2" }], span);
+  assert.deepEqual(checked.errors, [], "a miscited turn is repaired, not dropped");
+  assert.deepEqual(checked.values, [{ name: "the benchmark time", value: "166 ms", source: "u1" }], "sourced where the words really stand");
+  const wrong = checkNamedValues([{ name: "a value nobody said", value: "4242", ref: "u2" }], span);
+  assert.deepEqual(wrong.values, [], "a value no turn holds is still dropped");
+});
+
 test("checkNamedValues: nothing from a credential line, nothing random-looking, nothing that is not one printable line, and never fixable", () => {
   const checked = checkNamedValues([
     { name: "the deploy token", value: "Zx9Qw81LmN3pQr7Ts2Vb", ref: "u4" },

@@ -66,8 +66,10 @@ test("closeSpan: appends the diff events and the close, projects, fits the cap, 
 test("closeSpan: the cap fit retires from the checkpoint the pass renders, but the log keeps everything", () => {
   const log = logOf(closeEvent(1), closeEvent(2), closeEvent(3));
   const closed = closeSpan({ log, caps: { ...DEFAULT_CAPS, hardChars: 10 }, diffEvents: [], close: { fromRef: "u4", toRef: "u5", narrative: "x", narrativeLess: false, world: WORLD }, at: "t", measure: (state) => 5 * state.workLog.length });
-  assert.equal(closed.capFit.retired.workLog, 2);
-  assert.equal(closed.state.workLog.length, 2);
+  // 4 lines after the close; the cap retires down to the work-log floor and stops there (nothing else is retirable).
+  assert.equal(closed.capFit.retired.workLog, 1);
+  assert.equal(closed.state.workLog.length, 3);
+  assert.equal(closed.capFit.exhausted, true);
   assert.equal(project(closed.log, DEFAULT_CAPS).workLog.length, 4, "the log never deletes");
 });
 

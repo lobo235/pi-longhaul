@@ -26,6 +26,28 @@ entries and log event types. Rendered state text, prompt wording and section lay
 - The `longhaul_remember` prompt guidance names `q<n>` as evidence, and says an answer to `ask_user_question` is
   recorded already and that its words are never a correction's quote.
 
+### Fixed
+
+- The work log was empty on most compactions. Measured over one week of real sessions (668 compactions across 27
+  sessions), cap fit retired **every** line on 57% of them, and all but one on another 12%: a span's line is a
+  summarizer narrative that was told "one line per span" but never bounded, and real lines ran to ~1,800 characters, so
+  a 12-line section cost 20k characters of a 13,500-character state and the hard cap took the section whole. Two
+  changes, each enough on its own and together leaving headroom:
+  - Each line is cut to 300 characters in the render (`WORKLOG_LINE_CHARS`) and names the span to recall, so the
+    section is ~3.6k at its 12-line cap instead of unbounded.
+  - Cap fit stops at the newest 3 lines (`WORKLOG_FLOOR`) instead of retiring the section to empty; past that it
+    retires decisions and dead ends, which are each recallable by id. The rendered preamble tells the reader to trust
+    the work log for progress and not redo what it shows done, which an empty section cannot support.
+- A named value the summarizer cites in the wrong turn is kept, sourced at the turn that really holds it, instead of
+  rejected. This was the commonest lost field in the same week (43 of 109 rejections): each value was verbatim in
+  another turn of the same span, and the every-test re-check (shape, name, credential line, taint) runs on the holder
+  turn before it is kept.
+- The summarizing prompt shows a `/skill:` invocation as its name and the user's own words, not the skill's text. The
+  store already refused to quote a skill's text (it is the skill author's, not the user's), so the old rendering
+  invited rejections (11 of the 46 rejected objectives that week, in sessions opened by `/release` or another skill)
+  and spent a few thousand characters per such compaction on text the summarizer could not use.
+- A work log line for a span with no user ordinals of its own shows the span number alone instead of `[?–?]`.
+
 ## [v1.1.1] - 2026-10-23
 
 ### Fixed
