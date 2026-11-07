@@ -23,8 +23,9 @@ const QuoteRef = Type.Object({ messageRef: Ref, text: Text });
  * The `Now` block is the state's hottest section -- rendered into the prompt at every compaction --
  * so it is bounded where its shape is declared (security.md T2) rather than only by the route's output
  * budget and the renderer's cuts. The numbers are generous for one item and tight for a list: a
- * status line, not a paragraph, and two dozen of them. `store/events.ts` already bounds a
- * `remember`-written item at `itemChars` (300), so 400 can never reject what the store would keep.
+ * status line, not a paragraph, and two dozen of them. A `Now` item is a summarizer status line, not a
+ * store decision, so `store/events.ts` `itemChars` neither bounds nor can reject one: 400 is this
+ * section's own ceiling.
  */
 const NowItem = Type.String({ maxLength: NOW_ITEM_CHARS });
 const NowList = Type.Array(NowItem, { maxItems: NOW_ITEMS });

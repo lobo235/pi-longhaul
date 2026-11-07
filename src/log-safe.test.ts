@@ -57,3 +57,12 @@ test("logSafeRejected: a model-supplied value is logged as its length, even one 
   const [reason] = logSafeRejected([{ chunk: 0, path: "values[1]", final: true, rejection: { code: "value-rejected", ref: "u4", reason: "credential" } }], options);
   assert.equal(reason.reason, "credential");
 });
+
+test("logSafeRejected: the refused proposal rides only a debug log, and is a length in the normal one", () => {
+  const rejection = { code: "not-substring" as const, ref: "u5", excerpt: "Goal mode is active. Complete this goal fully: x", closest: "Change the thinking effort to medium", recent: [], proposed: "Make the default thinking effort medium" };
+  const quiet = logSafeRejected([{ chunk: 0, path: "objective", final: false, rejection }], { excerpts: false, stack: false });
+  assert.equal(quiet[0].proposed, undefined);
+  assert.equal(quiet[0].proposedChars, "Make the default thinking effort medium".length, "a length, like every other content field");
+  const debug = logSafeRejected([{ chunk: 0, path: "objective", final: false, rejection }], { excerpts: true, stack: false });
+  assert.equal(debug[0].proposed, "Make the default thinking effort medium");
+});

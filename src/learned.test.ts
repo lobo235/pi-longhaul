@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { carryLearnedValues, learnedValues, renderLearnedSection, sanitizeLearnedValues } from "./learned.ts";
+import { carryLearnedValues, learnedValues, renderLearnedSection, sanitizeLearnedValues, UNNAMED_LEARNED_SHOWN } from "./learned.ts";
 
 type Message = Record<string, unknown>;
 const user = (text: string): Message => ({ role: "user", content: text });
@@ -303,4 +303,17 @@ test("a secret file opened with the read tool, and a few more secret readers, te
     const messages = [call("t1", "read", { path }), result("t1", "read", "4.12.7"), say("Pinned at 4.12.7.")];
     assert.deepEqual(learnedValues(messages as never, COMMANDS).map((learned) => learned.value), ["4.12.7"], path);
   }
+});
+
+test("renderLearnedSection: named values lead and unnamed ones are capped, so pointers cannot own the budget", () => {
+  const unnamed = Array.from({ length: 20 }, (_, i) => ({ value: `abc1234${i}`, source: `C${100 + i}` }));
+  const named = [{ value: "336384", source: "u32", name: "the context cap" }, { value: "3.0 MB", source: "u28", name: "repo size" }];
+  const section = renderLearnedSection([...unnamed, ...named], 1500);
+  const lines = section.slice(1);
+  assert.equal(lines[0], "- 336384 (u32; the context cap)", "a named value leads");
+  assert.equal(lines[1], "- 3.0 MB (u28; repo size)");
+  const unnamedShown = lines.filter((line) => !line.includes("; "));
+  assert.equal(unnamedShown.length, UNNAMED_LEARNED_SHOWN);
+  assert.match(section[0], /; 10 more not shown\)$/, "the cap is reported, not silent");
+  assert.ok(section.join("\n").length < 1000, `${section.join("\n").length} chars`);
 });

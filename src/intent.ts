@@ -6,11 +6,15 @@
  * when the ordinal is wrong, the tool hand by the user's words alone, resolved newest-first. In a
  * /goal-mode message only the objective is the user's; pi's template around it is never quotable. Only user messages can be quoted, so text injected
  * through a tool result cannot mint or lift a standing rule, and only a goal pi-goal recorded on the branch can set the objective on its own.
+ * An answered `ask_user_question` is numbered `q1`, `q2`, ... (operator-answers.ts): it may be CITED as a decision's
+ * evidence, never quoted as a rule, so the operator's choice is recoverable without a tool result minting anything.
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
+import { scrubCredentials } from "./credential-scrub.ts";
 import { MIN_QUOTE_CHARS, type Quote, type Rejection } from "./store/events.ts";
+import { answersInBranch, answerLookupText, type OperatorAnswer } from "./operator-answers.ts";
 import type { QuoteChecker } from "./store/log.ts";
 import type { QuoteResolution, QuoteResolver } from "./store/verify.ts";
 import { NEGATED, WITHDRAWAL_CUE } from "./store/lift-vocabulary.ts";
@@ -52,6 +56,16 @@ export function userText(message: AgentMessage): string {
   if (typeof message.content === "string") return message.content;
   if (!Array.isArray(message.content)) return "";
   return message.content.filter((block): block is { type: "text"; text: string } => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("\n");
+}
+
+/**
+ * The model's own words for a refused field, bounded and scrubbed: what a debug log shows so a refusal can be read as
+ * "paraphrased" or "cited the wrong turn" rather than guessed at (log-safe.ts keeps it out of a normal log).
+ */
+export const PROPOSED_CHARS = 200;
+export function proposedText(text: string): string {
+  const flat = normalizeWs(scrubCredentials(text).text);
+  return flat.length > PROPOSED_CHARS ? `${flat.slice(0, PROPOSED_CHARS - 1)}…` : flat;
 }
 
 export function normalizeWs(text: string): string {
@@ -283,14 +297,15 @@ function indexUserMessages(branchEntries: SessionEntry[]): IndexedUserMessage[] 
   return messages;
 }
 
-/** Evidence refs a proposal may cite: a ledger command/error id, a user ordinal, or the two literals. */
-function evidenceChecker(evidence: EvidenceRefs, byOrdinal: ReadonlyMap<string, IndexedUserMessage>): (value: string) => boolean {
+/** Evidence refs a proposal may cite: a ledger command/error id, a user ordinal, an answered question, or the two literals. */
+function evidenceChecker(evidence: EvidenceRefs, byOrdinal: ReadonlyMap<string, IndexedUserMessage>, byAnswer: ReadonlyMap<string, OperatorAnswer>): (value: string) => boolean {
   return (value) => {
     const trimmed = value.trim();
     if (trimmed === "last command" || trimmed === "last error") return true;
     if (/^C\d+$/.test(trimmed)) return evidence.commandIds.has(trimmed);
     if (/^E\d+$/.test(trimmed)) return evidence.errorIds.has(trimmed);
     if (/^u\d+$/.test(trimmed)) return byOrdinal.has(trimmed);
+    if (/^q\d+$/.test(trimmed)) return byAnswer.has(trimmed);
     return false;
   };
 }
@@ -306,7 +321,7 @@ function quoteChecks(messages: IndexedUserMessage[], byOrdinal: ReadonlyMap<stri
   const notSubstring = (ref: string, candidates: IndexedUserMessage[], wanted: string): QuoteResolution => {
     const first = candidates[0];
     const closest = candidates.map((candidate) => closestWindow(quotableText(candidate.text), wanted)).find((window) => window !== undefined);
-    const rejection: Extract<Rejection, { code: "not-substring" }> = { code: "not-substring", ref, excerpt: first ? excerpt(first.text) : "", closest, recent: recent(RECENT_SHOWN) };
+    const rejection: Extract<Rejection, { code: "not-substring" }> = { code: "not-substring", ref, excerpt: first ? excerpt(first.text) : "", closest, recent: recent(RECENT_SHOWN), proposed: proposedText(wanted) };
     return { ok: false, rejection };
   };
 
@@ -333,7 +348,7 @@ function quoteChecks(messages: IndexedUserMessage[], byOrdinal: ReadonlyMap<stri
     const hit = newestHolding(wanted);
     if (hit) return bound(hit, wanted);
     if (ref === undefined) return notSubstring("any user message", [...messages].reverse(), wanted);
-    if (!cited) return { ok: false, rejection: { code: "unknown-ref", ref, known: known() } };
+    if (!cited) return { ok: false, rejection: { code: "unknown-ref", ref, known: known(), proposed: proposedText(wanted) } };
     return notSubstring(ref, [cited], wanted);
   };
 
@@ -354,16 +369,18 @@ export function buildMessageIndex(branchEntries: SessionEntry[], evidence: Evide
   const active = activeGoalId(branchEntries);
   const byOrdinal = new Map(messages.map((message) => [message.ordinal, message]));
   const byId = new Map(messages.map((message) => [message.messageId, message]));
+  const byAnswer = new Map(answersInBranch(branchEntries).map((answer) => [answer.ordinal, answer]));
   const { resolve, holds, recent } = quoteChecks(messages, byOrdinal, byId);
 
   return {
     messages,
     resolve,
     holds,
-    hasEvidence: evidenceChecker(evidence, byOrdinal),
+    hasEvidence: evidenceChecker(evidence, byOrdinal, byAnswer),
     position: (messageId) => byId.get(messageId)?.position,
     messageText: (messageId) => { const message = byId.get(messageId); return message && quotableText(message.text); },
-    textOf: (ordinal) => byOrdinal.get(ordinal)?.text,
+    // A user ordinal, or an answered question's `q<n>`: what the operator chose, and the question it answered.
+    textOf: (ordinal) => byOrdinal.get(ordinal)?.text ?? answerLookupText(byAnswer.get(ordinal)),
     recent,
     defaultObjective: () => defaultObjectiveOf(messages, goals, active),
     spanRefs: (span) => {

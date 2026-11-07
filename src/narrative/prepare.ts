@@ -49,20 +49,48 @@ export function stripThinkingBlocks(messages: AgentMessage[]): { messages: Agent
   return { messages: out, strippedBlocks, strippedChars };
 }
 
-function prefixed(message: AgentMessage, ordinal: string): AgentMessage {
+/** How a skill invocation is named wherever the summarizer is shown it: the skill's text is not the user's. */
+export const skillTag = (name: string): string => `[/skill:${normalizeWs(name).slice(0, 40)}]`;
+
+/**
+ * A user message that is a `/skill:` invocation, as the CONVERSATION shows it: the skill's name and the user's own
+ * words, never the skill's text.
+ *
+ * The block is already unquotable (`intent.ts`: a skill is its author's text, so only the words after it are the
+ * user's), and the message list above already shows it this way -- but the conversation body used to carry the skill's
+ * whole text, cut only by the serializer's caps. That invited quotes the store then refused (11 of the 46 rejected
+ * objectives in one real week came from exactly this, in sessions opened by `/release` or another skill) and spent a
+ * few thousand characters of every such compaction's summarizing prompt on text the summarizer must not use.
+ */
+function withoutSkillText(tagged: string): string {
+  const skill = skillInvocationOf(tagged);
+  if (!skill) return tagged;
+  return `${skillTag(skill.name)} ${skill.words ? spanExcerpt(skill.words) : "(no words of the user's own)"}`;
+}
+
+/** Replace a user message's text with `text`, keeping any non-text blocks (an image) it carried. */
+function withText(message: AgentMessage & { content: unknown }, text: string): AgentMessage {
+  if (typeof message.content === "string") return { ...message, content: text } as AgentMessage;
+  if (!Array.isArray(message.content)) return message;
+  const other = (message.content as Array<{ type: string }>).filter((block) => block.type !== "text");
+  return { ...message, content: [{ type: "text", text }, ...other] } as AgentMessage;
+}
+
+function prefixed(message: AgentMessage & { content: unknown }, ordinal: string): AgentMessage {
   if (message.role !== "user") return message;
   const tag = `[${ordinal}] `;
-  if (typeof message.content === "string") return { ...message, content: `${tag}${message.content}` } as AgentMessage;
+  // Detected on the message's own text: the skill block must open it, and the tag would get in the way.
+  if (typeof message.content === "string") return withText(message, `${tag}${withoutSkillText(message.content)}`);
   if (!Array.isArray(message.content)) return message;
   const content = [...message.content];
+  const said = content.filter((block) => block.type === "text").map((block) => (block as { text: string }).text).join("\n");
+  const collapsed = withoutSkillText(said);
+  if (collapsed !== said) return withText(message, `${tag}${collapsed}`);
   const first = content.findIndex((block) => block.type === "text");
   if (first < 0) content.unshift({ type: "text", text: tag } as (typeof content)[number]);
   else content[first] = { ...content[first], text: `${tag}${(content[first] as { text: string }).text}` } as (typeof content)[number];
   return { ...message, content } as AgentMessage;
 }
-
-/** How a skill invocation is named wherever the summarizer is shown it: the skill's text is not the user's. */
-export const skillTag = (name: string): string => `[/skill:${normalizeWs(name).slice(0, 40)}]`;
 
 /** What the message list shows: a /goal by its objective, a skill invocation by its name and the user's own words. */
 export function listedExcerpt(text: string): string {

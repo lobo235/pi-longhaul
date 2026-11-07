@@ -218,8 +218,8 @@ A quote must be at least 12 characters of one of your messages, word for word.
 dead ends, corrections, one of your messages (`u12`), the files list, or the exact output of a command or
 error (`output C12`, paged). Credential-shaped lines in output are replaced by a marker.
 
-The two tools add about 3,800 characters to every request (their schemas and their prompt guidelines), roughly
-1,000 tokens depending on the tokenizer.
+The two tools add about 4,200 characters to every request (their schemas and their prompt guidelines), roughly
+1,100 tokens depending on the tokenizer.
 
 ## Configuration
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import type { CommandRecord, ErrorRecord } from "./ledger/handoff.ts";
-import { CONDENSED_CORRECTION_CHARS, render, renderQuote, type RenderInput } from "./render.ts";
+import { CONDENSED_CORRECTION_CHARS, render, renderQuote, WORKLOG_LINE_CHARS, type RenderInput } from "./render.ts";
 import { DEFAULT_CAPS } from "./store/events.ts";
 import { project } from "./store/project.ts";
 import { closeEvent, ev, logOf, NOW, quote, resetSeq, WORLD } from "./store/test-support.ts";
@@ -174,4 +174,29 @@ test("render: a correction the cap fit condensed is cut to an excerpt naming its
   const r2 = lines.find((line) => line.startsWith("- R2 "))!;
   assert.equal(r1, `- R1 [u2] "${words.slice(0, CONDENSED_CORRECTION_CHARS - 1)}… (longhaul_recall message u2)"`);
   assert.equal(r2, `- R2 [u3] "${words}"`, "a correction not condensed renders whole up to correctionChars");
+});
+
+test("render: a work-log line is cut to WORKLOG_LINE_CHARS and names the span to recall, so one verbose span cannot fill the state", () => {
+  const long = "resolved the stalled force-push by rebasing onto the clean base and pushing over HTTPS; ".repeat(40);
+  const state = project(logOf(
+    ev({ kind: "objective.set", quote: quote("u1", "build the state compactor please") }),
+    closeEvent(1, { narrative: long }),
+    closeEvent(2, { narrative: "short span" }),
+  ), DEFAULT_CAPS);
+  const text = render({ state, tokensBefore: 0, ledger: { commands: [], errors: [] }, caps: DEFAULT_CAPS });
+  const lines = text.split("\n").filter((line) => /^\d+\. /.test(line));
+  assert.ok(lines[0].length <= WORKLOG_LINE_CHARS + 60, `${lines[0].length}`);
+  assert.ok(lines[0].includes("…"), "the cut is visible");
+  assert.match(lines[0], /\(longhaul_recall span 1\)$/, "the cut names where the detail is");
+  assert.match(lines[1], /^2\. \[u2–u3\] short span$/, "a short line is shown whole");
+});
+
+test("render: a span with no ordinals of its own shows the span number alone, not [?–?]", () => {
+  const state = project(logOf(
+    ev({ kind: "objective.set", quote: quote("u1", "build the state compactor please") }),
+    closeEvent(1, { fromRef: "?", toRef: "?" }),
+  ), DEFAULT_CAPS);
+  const text = render({ state, tokensBefore: 0, ledger: { commands: [], errors: [] }, caps: DEFAULT_CAPS });
+  assert.doesNotMatch(text, /\?–\?/);
+  assert.match(text, /^1\. /m);
 });

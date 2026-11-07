@@ -64,6 +64,22 @@ test("prepareSpan: a skill invocation is listed by the skill's name and the user
   ]);
 });
 
+test("prepareSpan: the conversation body shows a skill invocation by its name and the user's words too, so the summarizer never reads (or quotes) the skill's text", () => {
+  const skillText = `<skill name="release" location="/skills/release/SKILL.md">\nReferences are relative to /skills/release.\n\n# Release\n\nNever push the tag first.\n</skill>`;
+  const withWords = `${skillText}\n\nrelease the widget app`;
+  const entries = chain([userEntry("m1", withWords), assistantEntry("a1", "on it"), userEntry("m2", skillText), assistantEntry("a2", "ok")]);
+  const messages = entries.map((entry) => (entry as unknown as { message: AgentMessage }).message);
+  const span = prepareSpan({ messagesToSummarize: messages, turnPrefixMessages: [], index: buildMessageIndex(entries, EVIDENCE) });
+  const body = (message: AgentMessage) => {
+    const content = (message as { content?: unknown }).content;
+    return typeof content === "string" ? content : JSON.stringify(content);
+  };
+  assert.equal(body(span.messages[0]), "[u1] [/skill:release] release the widget app");
+  assert.equal(body(span.messages[2]), "[u2] [/skill:release] (no words of the user's own)");
+  for (const message of span.messages) assert.doesNotMatch(body(message), /Never push the tag first/, "no skill text reaches the conversation");
+  assert.equal(span.ordinals[0].text, withWords, "the index still holds the message's own bytes for a quote check");
+});
+
 test("prepareSpan: a message is listed whole up to 240 characters, and a longer one ends in an ellipsis where it is cut", () => {
   const short = `Keep the type hints for the ledger package itself; ${"the test files may skip them. ".repeat(5)}`.trim();
   const long = `The type hint rule is lifted for test files, but keep it for the ledger package itself. ${"Then rerun the suite and paste the summary. ".repeat(6)}`.trim();

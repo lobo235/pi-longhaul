@@ -5,6 +5,12 @@
  * since an old rule binds as much as a new one. Objective, Now and World are never touched. The size function is
  * injected so this stays a pure step over the projection and the loop provably terminates: every step retires or
  * condenses one item or stops.
+ *
+ * The work log retires first because its lines are the reconstructible ones -- each names its span refs, so `recall`
+ * returns the detail -- but it never retires to EMPTY: the rendered preamble tells the reader to trust the work log for
+ * progress and not to redo what it shows done, and a section that reads "(none)" while 12 lines have just been retired
+ * tells it nothing. Real sessions sat at 98% of the hard cap and lost every line on 57% of compactions (381 of 668 in
+ * one week), so the last WORKLOG_FLOOR lines stay and the loop moves on to decisions.
  */
 import type { Caps } from "./events.ts";
 import type { SessionState } from "./project.ts";
@@ -20,11 +26,18 @@ export interface CapFitResult {
 
 type Section = keyof CapFitResult["retired"];
 const ORDER: Section[] = ["workLog", "decisions", "deadEnds"];
+/**
+ * The work log never retires below this many lines, whatever the cap pressure: the newest few spans are what
+ * "do not redo steps they show done" is read from, and they cost ~100 characters each. Retirement then moves on to
+ * decisions, which are recallable by id with their evidence, and to dead ends.
+ */
+export const WORKLOG_FLOOR = 3;
 
-/** Retire the oldest active item of `section`; false when there is none. */
+/** Retire the oldest active item of `section`; false when there is none (or the work log is at its floor). */
 function retireOne(state: SessionState, section: Section): boolean {
   if (section === "workLog") {
-    if (state.workLog.length === 0) return false;
+    // Every line counts, the consolidated "spans X–Y retired" line too: the floor is about the section not reading empty.
+    if (state.workLog.length <= WORKLOG_FLOOR) return false;
     state.workLog.shift();
     state.retired.workLog++;
     return true;

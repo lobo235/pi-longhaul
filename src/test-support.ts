@@ -135,9 +135,9 @@ export function assistantEntry(id: string, text: string, toolCalls: Array<{ name
   const message = { role: "assistant", content, api: "openai-completions", provider: "example", model: "model-a", usage: USAGE, stopReason: toolCalls.length ? "toolUse" : "stop", timestamp: nextTs } as unknown as AgentMessage;
   return { type: "message", id, parentId: null, timestamp: new Date(nextTs).toISOString(), message } as SessionEntry;
 }
-export function toolResultEntry(id: string, toolCallId: string, toolName: string, text: string, isError = false): SessionEntry {
+export function toolResultEntry(id: string, toolCallId: string, toolName: string, text: string, isError = false, details?: unknown): SessionEntry {
   nextTs += 1000;
-  const message = { role: "toolResult", toolCallId, toolName, content: [{ type: "text", text }], isError, timestamp: nextTs } as unknown as AgentMessage;
+  const message = { role: "toolResult", toolCallId, toolName, content: [{ type: "text", text }], isError, ...(details === undefined ? {} : { details }), timestamp: nextTs } as unknown as AgentMessage;
   return { type: "message", id, parentId: null, timestamp: new Date(nextTs).toISOString(), message } as SessionEntry;
 }
 export function compactionEntry(id: string, details: unknown, fromHook = true): SessionEntry {

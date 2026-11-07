@@ -28,7 +28,12 @@ import { logOptionsOf, logSafeError } from "./log-safe.ts";
 import { stripKeptWindowContext, type KeptWindowThinking } from "./kept-window.ts";
 import { foreignCompactionNotice, localOnlyRootsNotice, smallWindowNotice } from "./notices.ts";
 import { requestRunningTasks } from "./tasks.ts";
-import { SPAN_ENTRY_TYPE } from "./store/events.ts";
+import { EVENT_ENTRY_TYPE, SPAN_ENTRY_TYPE, STATE_FORMAT } from "./store/events.ts";
+import { answersFromDetails, answerEvents, ASK_TOOL } from "./operator-answers.ts";
+import { messagesInContext } from "./tool-context.ts";
+import { spanCredentials } from "./span-credentials.ts";
+import { project } from "./store/project.ts";
+import { buildToolContext } from "./tool-context.ts";
 
 /** One compaction Longhaul's hook took, read back once by session_compact or session_compact_failed. */
 interface InFlight {
@@ -106,6 +111,21 @@ export default function compactionStateExtension(pi: ExtensionAPI, options?: { p
     if (!standsDown()) warnOnce(rt, ctx, "small-window", smallWindowNotice(event.model));
   });
 
+  // An answered `ask_user_question` is the operator's own decision at a fork in the road, and it reaches the transcript
+  // as a TOOL RESULT: pi's own compaction would keep it only as the summarizer's discretion, and a quote of it can never
+  // be a rule (intent.ts). Record each answer as a decision the moment it lands, through the store's own gate
+  // (operator-answers.ts). Never throws: a capture that fails must not cost the tool its result.
+  pi.on("tool_result", async (event, ctx) => {
+    if (event.toolName !== ASK_TOOL || event.isError || standsDown()) return undefined;
+    try {
+      captureAnswers(rt, event.details, ctx);
+    } catch (error) {
+      const log = logPath();
+      if (log) appendJsonl(log, { ...sessionFields(ctx), event: "answer-capture-failed", ...logSafeError(error, logOptionsOf(process.env)) });
+    }
+    return undefined;
+  });
+
   // Registered in every session (not only a state-selected one): a stood-down session can still
   // remember, and its writes ride the branch until the next state pass folds them in.
   registerRememberTool(pi);
@@ -114,6 +134,21 @@ export default function compactionStateExtension(pi: ExtensionAPI, options?: { p
   pi.on("session_before_compact", async (event, ctx) => beforeCompact(rt, event, ctx));
   pi.on("session_compact", async (event, ctx) => afterCompact(rt, event, ctx));
   pi.on("session_compact_failed", async (event, ctx) => compactFailed(rt, event, ctx));
+}
+
+/**
+ * Record every answered question of one `ask_user_question` result as a decision (operator-answers.ts). The tool result
+ * is not on the branch yet -- pi runs the `tool_result` hook before appending it -- so the answers are read from the
+ * event's own `details`, and their `q<n>` ordinals are assigned later, when the index reads the branch.
+ */
+function captureAnswers(rt: Runtime, details: unknown, ctx: ExtensionContext): void {
+  const answers = answersFromDetails(details);
+  if (answers.length === 0) return;
+  const config = resolveStateConfig(readConfigFile);
+  const context = buildToolContext(ctx.sessionManager.getBranch());
+  const credentials = spanCredentials(messagesInContext(ctx.sessionManager.getBranch()));
+  const events = answerEvents(answers, { state: project(context.log, config.caps), resolver: context.index, caps: config.caps, span: context.log.openSpan, at: new Date().toISOString(), credentials });
+  for (const event of events) rt.pi.appendEntry(EVENT_ENTRY_TYPE, { ...event, stateFormat: STATE_FORMAT });
 }
 
 function onSessionStart(rt: Runtime, ctx: ExtensionContext): void {

@@ -9,7 +9,7 @@ import { renderFilesSection } from "./files-render.ts";
 import { oneLine } from "./one-line.ts";
 import { renderLearnedSection, type LearnedValue } from "./learned.ts";
 import type { Caps, Quote } from "./store/events.ts";
-import { activeCorrections, activeDeadEnds, activeDecisions, activeWorkLog, GOAL_SOURCE_LABEL, goalLine, type SessionState, type TextItem } from "./store/project.ts";
+import { activeCorrections, activeDeadEnds, activeDecisions, activeWorkLog, GOAL_SOURCE_LABEL, goalLine, type SessionState, type TextItem, type WorkLogLine } from "./store/project.ts";
 import { renderTaskLine, type RunningTask } from "./tasks.ts";
 import { evaluateDoneGate, renderDoneGate, renderWorldLines } from "./world-render.ts";
 
@@ -68,6 +68,11 @@ function tokensLabel(tokens: number): string {
 }
 
 export const EARLIER_REQUESTS_SHOWN = 2;
+/**
+ * How much of an earlier request is shown. Its own bound rather than `caps.itemChars`: that cap governs the free text of
+ * a decision (1024), while an earlier request is context, cut like a rule line so the history cannot crowd the state.
+ */
+export const EARLIER_REQUEST_CHARS = 300;
 export const EARLIER_REQUESTS_LABEL = "Earlier requests (may already be done; check the work log and newer messages):";
 
 /** The newest Requests the summarizer moved away from, distinct, never the current one or the Goal line. */
@@ -96,7 +101,7 @@ function objectiveSection({ state, ledger, snapshot, caps }: RenderInput): strin
   const doneWhen = objective?.doneWhen ? `Done when: ${renderQuote(objective.doneWhen, caps.objectiveQuoteChars)} (${objective.doneWhen.ordinal})` : "Done when: not stated";
   const gate = renderDoneGate(evaluateDoneGate(objective?.doneWhen?.text, ledger.commands, state.world?.claims ?? [], snapshot));
   const earlier = earlierRequests(state, goal?.quote);
-  const earlierLines = earlier.length ? [EARLIER_REQUESTS_LABEL, ...earlier.map((quote) => `- ${quote.ordinal} ${renderQuote(quote, caps.itemChars)}`)] : [];
+  const earlierLines = earlier.length ? [EARLIER_REQUESTS_LABEL, ...earlier.map((quote) => `- ${quote.ordinal} ${renderQuote(quote, EARLIER_REQUEST_CHARS)}`)] : [];
   return [`## Objective (${heading})`, ...goalLines, ...request, doneWhen, gate, ...earlierLines];
 }
 
@@ -127,8 +132,27 @@ function learnedSection({ learned, caps }: RenderInput): string[] {
   return learned ? renderLearnedSection(learned, caps.learnedChars) : [];
 }
 
+/**
+ * How much of one span's line the work log shows. A line is a span's own narrative, and a summarizer asked for "one line
+ * per span" writes far more than a line when nothing bounds it: real sessions carried lines of ~1,800 characters, so the
+ * section cost 20k characters at 12 spans and the hard cap retired every line of it. 300 characters is the length the
+ * README example and the state's own framing assume ("one line per span; detail via longhaul_recall"); the cut names
+ * the span to recall.
+ */
+export const WORKLOG_LINE_CHARS = 300;
+
+function workLogLine(line: WorkLogLine): string {
+  const text = oneLine(line.text);
+  const shown = text.length <= WORKLOG_LINE_CHARS ? text : `${text.slice(0, WORKLOG_LINE_CHARS - 1).trimEnd()}… (${RECALL_TOOL} span ${line.span})`;
+  if (line.retiredSpans) return `- ${shown}`;
+  // A span with no user message of its own (a restart, a carried tail) has no ordinals to point at: "[?–?]" is noise on
+  // every such line, and the span number already says where the detail is.
+  const refs = `${oneLine(line.fromRef)}–${oneLine(line.toRef)}`;
+  return `${line.span}.${refs === "?–?" ? "" : ` [${refs}]`} ${shown}`;
+}
+
 function workLogSection({ state }: RenderInput): string[] {
-  const lines = activeWorkLog(state).map((line) => (line.retiredSpans ? `- ${line.text}` : `${line.span}. [${oneLine(line.fromRef)}–${oneLine(line.toRef)}] ${oneLine(line.text)}`));
+  const lines = activeWorkLog(state).map(workLogLine);
   return [`## Work log (one line per span; detail via ${RECALL_TOOL}${retiredNote(state.retired.workLog)})`, ...(lines.length ? lines : ["(no spans closed yet)"])];
 }
 

@@ -8,6 +8,65 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026-11-07
+
+### Added
+
+- An answered `ask_user_question` is recorded as a decision the moment it lands, numbered `q1`, `q2`, ... in branch
+  order. Both a picked option and a typed answer become one: a fork in the road is what the state exists for, and the
+  answer otherwise survives only at the next compaction's discretion. A decision of your own can cite the answer it
+  rests on as `evidence: "q<n>"`, and `longhaul_recall what=message query=q3` shows the question and what you chose. A
+  declined questionnaire records nothing. An answer's words are never a quotable rule: it arrives as a tool result,
+  so a standing rule typed there is carried by the agent's own decision sentence (`docs/security.md` T2). Provenance is
+  `source: "code"` -- a fourth `Source` value, because `pass` means the pass wrote it and this write happens at a tool
+  result (ADR 0007).
+
+### Changed
+
+- `caps.decisions` is 20, was 10. A fork-heavy span can settle eight questions in a row, and with ten slots those
+  answers pushed out the decisions the agent wrote in the same span. The 13,500-character hard cap still bounds the
+  render, so the count is a tidy-up limit rather than the binding one. Note what that means with the answer capture on:
+  code alone can now place up to ~8.8k characters of decision text (20 slots x the 440-character answer item) into a
+  13,500-character state without the agent or the operator acting at that moment, so a burst of answers can retire the
+  older decisions and, past 20, the oldest answers. That is the state's standing rule -- oldest first, each still
+  recallable by id -- but it is now reachable in one span rather than over several.
+- The `## Learned values` section leads with the values the summarizer named and shows at most the newest ten unnamed
+  ones (`UNNAMED_LEARNED_SHOWN`); it said `N more not shown` before. In one real state, 45 of 49 lines were unnamed
+  code-derived pointers (`- 8d4fbb6 (C2526)`) and spent 1,400 of the section's 1,500 characters, while the four named
+  lines carried the meaning.
+- A decision or a dead end may be up to 1,024 characters, was 300 (`caps.itemChars`): room for why it was decided,
+  not only what, which is the half that cannot be re-derived. The state's 13,500-character hard cap still bounds it and
+  retires the oldest items first when long ones crowd it. The `Earlier requests` section keeps its own 300-character
+  cut, so the objective history does not grow with the change.
+- The `longhaul_remember` prompt guidance names `q<n>` as evidence, and says an answer to `ask_user_question` is
+  recorded already and that its words are never a correction's quote.
+
+### Fixed
+
+- A refusal recorded only the message it compared against, never the text that was refused, so "not-substring" could
+  not be told apart from a paraphrase or a wrong citation when reading the log afterwards. A rejection now carries the
+  refused proposal (`proposed`), which the log keeps out unless `PI_COMPACT_STATE_DEBUG_EXCERPTS=1`, like every other
+  piece of the conversation; a normal log records its length as `proposedChars`.
+- The work log was empty on most compactions. Measured over one week of real sessions (668 compactions across 27
+  sessions), cap fit retired **every** line on 57% of them, and all but one on another 12%: a span's line is a
+  summarizer narrative that was told "one line per span" but never bounded, and real lines ran to ~1,800 characters, so
+  a 12-line section cost 20k characters of a 13,500-character state and the hard cap took the section whole. Two
+  changes, each enough on its own and together leaving headroom:
+  - Each line is cut to 300 characters in the render (`WORKLOG_LINE_CHARS`) and names the span to recall, so the
+    section is ~3.6k at its 12-line cap instead of unbounded.
+  - Cap fit stops at the newest 3 lines (`WORKLOG_FLOOR`) instead of retiring the section to empty; past that it
+    retires decisions and dead ends, which are each recallable by id. The rendered preamble tells the reader to trust
+    the work log for progress and not redo what it shows done, which an empty section cannot support.
+- A named value the summarizer cites in the wrong turn is kept, sourced at the turn that really holds it, instead of
+  rejected. This was the commonest lost field in the same week (43 of 109 rejections): each value was verbatim in
+  another turn of the same span, and the every-test re-check (shape, name, credential line, taint) runs on the holder
+  turn before it is kept.
+- The summarizing prompt shows a `/skill:` invocation as its name and the user's own words, not the skill's text. The
+  store already refused to quote a skill's text (it is the skill author's, not the user's), so the old rendering
+  invited rejections (11 of the 46 rejected objectives that week, in sessions opened by `/release` or another skill)
+  and spent a few thousand characters per such compaction on text the summarizer could not use.
+- A work log line for a span with no user ordinals of its own shows the span number alone instead of `[?–?]`.
+
 ## [v1.1.1] - 2026-10-23
 
 ### Fixed
