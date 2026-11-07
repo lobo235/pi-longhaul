@@ -68,6 +68,11 @@ function tokensLabel(tokens: number): string {
 }
 
 export const EARLIER_REQUESTS_SHOWN = 2;
+/**
+ * How much of an earlier request is shown. Its own bound rather than `caps.itemChars`: that cap governs the free text of
+ * a decision (1024), while an earlier request is context, cut like a rule line so the history cannot crowd the state.
+ */
+export const EARLIER_REQUEST_CHARS = 300;
 export const EARLIER_REQUESTS_LABEL = "Earlier requests (may already be done; check the work log and newer messages):";
 
 /** The newest Requests the summarizer moved away from, distinct, never the current one or the Goal line. */
@@ -96,7 +101,7 @@ function objectiveSection({ state, ledger, snapshot, caps }: RenderInput): strin
   const doneWhen = objective?.doneWhen ? `Done when: ${renderQuote(objective.doneWhen, caps.objectiveQuoteChars)} (${objective.doneWhen.ordinal})` : "Done when: not stated";
   const gate = renderDoneGate(evaluateDoneGate(objective?.doneWhen?.text, ledger.commands, state.world?.claims ?? [], snapshot));
   const earlier = earlierRequests(state, goal?.quote);
-  const earlierLines = earlier.length ? [EARLIER_REQUESTS_LABEL, ...earlier.map((quote) => `- ${quote.ordinal} ${renderQuote(quote, caps.itemChars)}`)] : [];
+  const earlierLines = earlier.length ? [EARLIER_REQUESTS_LABEL, ...earlier.map((quote) => `- ${quote.ordinal} ${renderQuote(quote, EARLIER_REQUEST_CHARS)}`)] : [];
   return [`## Objective (${heading})`, ...goalLines, ...request, doneWhen, gate, ...earlierLines];
 }
 

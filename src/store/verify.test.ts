@@ -123,7 +123,7 @@ test("applyProposals: verified in order against a scratch projection, so the sec
     { kind: "correction", text: "Never use mocks in these tests" },
     { kind: "correction", text: "Never use mocks in these tests; use fakes" },
     { kind: "decision", text: "copy, never import" },
-    { kind: "decision", text: "x".repeat(400) },
+    { kind: "decision", text: "x".repeat(DEFAULT_CAPS.itemChars + 1) },
   ], ctxWith({ provenance: { ...PROV, source: "diff" } }));
   assert.deepEqual(result.events.map((event) => (event as { id?: string }).id), ["R1", "D1"]);
   assert.deepEqual(result.rejected.map((r) => [r.index, r.rejection.code]), [[1, "near-duplicate"], [3, "too-long"]]);

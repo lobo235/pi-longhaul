@@ -35,7 +35,7 @@ test("remember tool: an accepted write appends the event entry and answers with 
   registerRememberTool(pi, { readConfig: () => undefined, now });
   const tool = tools.find((candidate) => candidate.name === "longhaul_remember")!;
   assert.equal(tool.executionMode, "sequential");
-  assert.equal((tool.promptGuidelines as string[] | undefined)?.length, 2);
+  assert.equal((tool.promptGuidelines as string[] | undefined)?.length, 3);
   const branch = chain([userEntry("m1", "Build the state compactor and keep it small"), assistantEntry("a1", "ok"), userEntry("m2", "never use mocks in these tests, fakes only"), assistantEntry("a2", "sure")]);
   const { ctx } = fakeCtx({ branch });
   const accepted = await exec(tool, { kind: "correction", quote: "never use mocks in these tests" }, ctx);

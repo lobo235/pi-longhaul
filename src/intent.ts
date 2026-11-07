@@ -6,11 +6,14 @@
  * when the ordinal is wrong, the tool hand by the user's words alone, resolved newest-first. In a
  * /goal-mode message only the objective is the user's; pi's template around it is never quotable. Only user messages can be quoted, so text injected
  * through a tool result cannot mint or lift a standing rule, and only a goal pi-goal recorded on the branch can set the objective on its own.
+ * An answered `ask_user_question` is numbered `q1`, `q2`, ... (operator-answers.ts): it may be CITED as a decision's
+ * evidence, never quoted as a rule, so the operator's choice is recoverable without a tool result minting anything.
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
 import { MIN_QUOTE_CHARS, type Quote, type Rejection } from "./store/events.ts";
+import { answersInBranch, answerLookupText, type OperatorAnswer } from "./operator-answers.ts";
 import type { QuoteChecker } from "./store/log.ts";
 import type { QuoteResolution, QuoteResolver } from "./store/verify.ts";
 import { NEGATED, WITHDRAWAL_CUE } from "./store/lift-vocabulary.ts";
@@ -283,14 +286,15 @@ function indexUserMessages(branchEntries: SessionEntry[]): IndexedUserMessage[] 
   return messages;
 }
 
-/** Evidence refs a proposal may cite: a ledger command/error id, a user ordinal, or the two literals. */
-function evidenceChecker(evidence: EvidenceRefs, byOrdinal: ReadonlyMap<string, IndexedUserMessage>): (value: string) => boolean {
+/** Evidence refs a proposal may cite: a ledger command/error id, a user ordinal, an answered question, or the two literals. */
+function evidenceChecker(evidence: EvidenceRefs, byOrdinal: ReadonlyMap<string, IndexedUserMessage>, byAnswer: ReadonlyMap<string, OperatorAnswer>): (value: string) => boolean {
   return (value) => {
     const trimmed = value.trim();
     if (trimmed === "last command" || trimmed === "last error") return true;
     if (/^C\d+$/.test(trimmed)) return evidence.commandIds.has(trimmed);
     if (/^E\d+$/.test(trimmed)) return evidence.errorIds.has(trimmed);
     if (/^u\d+$/.test(trimmed)) return byOrdinal.has(trimmed);
+    if (/^q\d+$/.test(trimmed)) return byAnswer.has(trimmed);
     return false;
   };
 }
@@ -354,16 +358,18 @@ export function buildMessageIndex(branchEntries: SessionEntry[], evidence: Evide
   const active = activeGoalId(branchEntries);
   const byOrdinal = new Map(messages.map((message) => [message.ordinal, message]));
   const byId = new Map(messages.map((message) => [message.messageId, message]));
+  const byAnswer = new Map(answersInBranch(branchEntries).map((answer) => [answer.ordinal, answer]));
   const { resolve, holds, recent } = quoteChecks(messages, byOrdinal, byId);
 
   return {
     messages,
     resolve,
     holds,
-    hasEvidence: evidenceChecker(evidence, byOrdinal),
+    hasEvidence: evidenceChecker(evidence, byOrdinal, byAnswer),
     position: (messageId) => byId.get(messageId)?.position,
     messageText: (messageId) => { const message = byId.get(messageId); return message && quotableText(message.text); },
-    textOf: (ordinal) => byOrdinal.get(ordinal)?.text,
+    // A user ordinal, or an answered question's `q<n>`: what the operator chose, and the question it answered.
+    textOf: (ordinal) => byOrdinal.get(ordinal)?.text ?? answerLookupText(byAnswer.get(ordinal)),
     recent,
     defaultObjective: () => defaultObjectiveOf(messages, goals, active),
     spanRefs: (span) => {

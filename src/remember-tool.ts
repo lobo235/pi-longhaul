@@ -69,6 +69,7 @@ export function registerRememberTool(pi: ExtensionAPI, deps: { readConfig: ReadF
     promptGuidelines: [
       `Call \`${REMEMBER_TOOL}\` the moment the user states a standing rule, one that still binds once the current task is done (kind correction, quote their exact words; a request for the task at hand is not one), or when you settle a decision or abandon an approach (kind decision / dead-end, one sentence with evidence C<n>/E<n>/u<n>).`,
       "Never paraphrase a correction: the quote must be a substring of a user message, at least 12 characters, or it is rejected with the closest match.",
+      "An answer to `ask_user_question` is recorded as a decision when it lands; cite it as evidence `q<n>` (q1, q2, ... in order) when you record a decision of your own on top of it. Its words are never a rule: they arrive as a tool result, so a standing rule the operator typed there is carried by your own decision sentence, not by a correction quote.",
     ],
     parameters: PARAMETERS,
     executionMode: "sequential",

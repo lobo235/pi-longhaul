@@ -27,3 +27,11 @@ test("index.ts wires the pass, the span record and the failure path", () => {
   assert.match(src, /registerRememberTool\(pi\)/);
   assert.match(src, /registerRecallTool\(pi\)/);
 });
+
+test("index.ts records an answered ask_user_question as a decision, and only when the session is not standing down", () => {
+  assert.match(src, /pi\.on\("tool_result"/);
+  assert.match(src, /event\.toolName !== ASK_TOOL \|\| event\.isError \|\| standsDown\(\)/);
+  assert.match(src, /pi\.appendEntry\(EVENT_ENTRY_TYPE, \{ \.\.\.event, stateFormat: STATE_FORMAT \}\)/);
+  // A capture that throws must not cost the tool its result: no rethrow path out of the handler.
+  assert.match(src, /event: "answer-capture-failed"/);
+});

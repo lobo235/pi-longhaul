@@ -85,7 +85,11 @@ export interface Caps {
   correctionChars: number;
   decisions: number;
   deadEnds: number;
-  /** Free-text items (decisions, dead ends): over this they are rejected as too-long. */
+  /**
+   * Free-text items (decisions, dead ends): over this they are rejected as too-long. Room for the reason a decision was
+   * made, not only its outcome: a decision recovers what was chosen, the rationale is what cannot be re-derived. The
+   * state stays bounded by `hardChars`, which retires the oldest items first when long ones crowd it.
+   */
   itemChars: number;
   workLogLines: number;
   openErrors: number;
@@ -103,7 +107,7 @@ export interface Caps {
  */
 export const CORRECTIONS_CEILING = 64;
 
-export const DEFAULT_CAPS: Caps = { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 300, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 };
+export const DEFAULT_CAPS: Caps = { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 1024, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 };
 
 export const MIN_QUOTE_CHARS = 12;
 

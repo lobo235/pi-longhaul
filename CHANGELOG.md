@@ -8,6 +8,24 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+### Added
+
+- An answered `ask_user_question` is recorded as a decision the moment it lands, numbered `q1`, `q2`, ... in branch
+  order. Both a picked option and a typed answer become one: a fork in the road is what the state exists for, and the
+  answer otherwise survives only at the next compaction's discretion. A decision of your own can cite the answer it
+  rests on as `evidence: "q<n>"`, and `longhaul_recall what=message query=q3` shows the question and what you chose. A
+  declined questionnaire records nothing. An answer's words are never a quotable rule: it arrives as a tool result,
+  so a standing rule typed there is carried by the agent's own decision sentence (`docs/security.md` T2).
+
+### Changed
+
+- A decision or a dead end may be up to 1,024 characters, was 300 (`caps.itemChars`): room for why it was decided,
+  not only what, which is the half that cannot be re-derived. The state's 13,500-character hard cap still bounds it and
+  retires the oldest items first when long ones crowd it. The `Earlier requests` section keeps its own 300-character
+  cut, so the objective history does not grow with the change.
+- The `longhaul_remember` prompt guidance names `q<n>` as evidence, and says an answer to `ask_user_question` is
+  recorded already and that its words are never a correction's quote.
+
 ## [v1.1.1] - 2026-10-23
 
 ### Fixed

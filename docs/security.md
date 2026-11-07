@@ -56,6 +56,12 @@ The rendered state is re-sent on every request, so text in it has standing. Anyt
 the session (a web page, a README, another agent's message) could try to plant a "rule" there.
 
 - A correction is accepted only as a verbatim quote of a user message, checked as a substring.
+- An answered `ask_user_question` is recorded as a decision as soon as it lands, and numbered `q1`, `q2`, ... so a
+  decision can cite one as its evidence. Its words are still never quotable: the answer arrives as a tool result, so
+  the quote a correction needs stays a user message, and a standing rule the operator typed there can only be carried
+  by the agent's own decision sentence. The capture is keyed on the tool's name and reads the tool's structured
+  `details`, never text scraped out of the result, so another tool's output cannot pass for an answer; a declined
+  questionnaire records nothing, and everything recorded is scrubbed like any other model-written text (T3).
 - A `/goal` objective counts only when the message has pi-goal's exact template **and** pi-goal recorded that
   goal in its own custom entry: text that reaches pi as a user message can copy the template, but only
   extension code writes a custom entry. A stopped goal is cleared.

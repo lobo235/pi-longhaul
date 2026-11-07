@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { DEFAULT_CAPS, describeRejection, isStateEvent, MIN_QUOTE_CHARS, type Rejection, type StateEvent } from "./events.ts";
 
 test("DEFAULT_CAPS are the documented defaults", () => {
-  assert.deepEqual(DEFAULT_CAPS, { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 300, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 });
+  assert.deepEqual(DEFAULT_CAPS, { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 1024, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 });
   assert.equal(MIN_QUOTE_CHARS, 12);
 });
 
@@ -13,7 +13,7 @@ test("describeRejection: one model-facing sentence per code, naming the fix (tab
     [{ code: "unknown-ref", ref: "u99", known: ["u1", "u2"] }, /u99 is not a user message on this branch.*u1, u2/],
     [{ code: "not-user-message", ref: "a3" }, /a3 is not a user message/],
     [{ code: "not-substring", ref: "u2", excerpt: "please use fakes", closest: "use fakes not", recent: [{ ordinal: "u2", excerpt: "please use fakes not mocks" }] }, /not a verbatim substring of u2.*closest window.*"use fakes not".*u2: "please use fakes not mocks"/s],
-    [{ code: "too-long", max: 300, actual: 412 }, /412 characters.*at most 300/],
+    [{ code: "too-long", max: 1024, actual: 1200 }, /1200 characters.*at most 1024/],
     [{ code: "empty" }, /at least 12 characters/],
     [{ code: "near-duplicate", earlierId: "R2", overlap: 0.9 }, /duplicates R2 \(90% token overlap\).*do not retry/],
     [{ code: "unknown-target", target: "R9", known: ["R1", "R2"] }, /R9 is not a correction.*R1, R2/],
