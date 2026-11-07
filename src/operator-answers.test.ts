@@ -100,7 +100,7 @@ test("answerEvents: each answer becomes one decision through the mechanical hand
   const events = answerEvents(answersInBranch(branch), { state: emptyState(), resolver: index, caps: DEFAULT_CAPS, span: 1, at: "2026-11-06T10:00:00.000Z" });
   assert.deepEqual(events.map((event) => (event as { kind: string }).kind), ["decision.add", "decision.add"]);
   assert.deepEqual(events.map((event) => (event as { id: string }).id), ["D1", "D2"]);
-  assert.deepEqual(events.map((event) => (event as { source: string }).source), ["pass", "pass"], "not the model's remember budget");
+  assert.deepEqual(events.map((event) => (event as { source: string }).source), ["code", "code"], "observed, not a pass and not the model");
   assert.match((events[0] as { text: string }).text, /^Operator chose "GitHub \(Recommended\)" for: Where should the repo live\?$/);
   const state = events.reduce((folded, event) => applyEvent(folded, event, DEFAULT_CAPS), emptyState());
   assert.equal(state.decisions.length, 2);

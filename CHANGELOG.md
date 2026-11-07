@@ -15,10 +15,19 @@ entries and log event types. Rendered state text, prompt wording and section lay
   answer otherwise survives only at the next compaction's discretion. A decision of your own can cite the answer it
   rests on as `evidence: "q<n>"`, and `longhaul_recall what=message query=q3` shows the question and what you chose. A
   declined questionnaire records nothing. An answer's words are never a quotable rule: it arrives as a tool result,
-  so a standing rule typed there is carried by the agent's own decision sentence (`docs/security.md` T2).
+  so a standing rule typed there is carried by the agent's own decision sentence (`docs/security.md` T2). Provenance is
+  `source: "code"` -- a fourth `Source` value, because `pass` means the pass wrote it and this write happens at a tool
+  result (ADR 0007).
 
 ### Changed
 
+- `caps.decisions` is 20, was 10. A fork-heavy span can settle eight questions in a row, and with ten slots those
+  answers pushed out the decisions the agent wrote in the same span. The 13,500-character hard cap still bounds the
+  render, so the count is a tidy-up limit rather than the binding one.
+- The `## Learned values` section leads with the values the summarizer named and shows at most the newest ten unnamed
+  ones (`UNNAMED_LEARNED_SHOWN`); it said `N more not shown` before. In one real state, 45 of 49 lines were unnamed
+  code-derived pointers (`- 8d4fbb6 (C2526)`) and spent 1,400 of the section's 1,500 characters, while the four named
+  lines carried the meaning.
 - A decision or a dead end may be up to 1,024 characters, was 300 (`caps.itemChars`): room for why it was decided,
   not only what, which is the half that cannot be re-derived. The state's 13,500-character hard cap still bounds it and
   retires the oldest items first when long ones crowd it. The `Earlier requests` section keeps its own 300-character
@@ -28,6 +37,10 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ### Fixed
 
+- A refusal recorded only the message it compared against, never the text that was refused, so "not-substring" could
+  not be told apart from a paraphrase or a wrong citation when reading the log afterwards. A rejection now carries the
+  refused proposal (`proposed`), which the log keeps out unless `PI_COMPACT_STATE_DEBUG_EXCERPTS=1`, like every other
+  piece of the conversation; a normal log records its length as `proposedChars`.
 - The work log was empty on most compactions. Measured over one week of real sessions (668 compactions across 27
   sessions), cap fit retired **every** line on 57% of them, and all but one on another 12%: a span's line is a
   summarizer narrative that was told "one line per span" but never bounded, and real lines ran to ~1,800 characters, so

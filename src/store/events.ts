@@ -7,14 +7,19 @@ import type { CommandRecord, ErrorRecord, WorkspaceSnapshot } from "../ledger/ha
 import type { Claim } from "../world.ts";
 import { isRec, type Rec } from "../message-text.ts";
 
-export type Source = "remember" | "diff" | "pass";
+/**
+ * Who wrote an item. `remember` = the agent's own tool call, `diff` = the model's answer inside a pass, `pass` =
+ * mechanical, written by the pass itself, `code` = code recording something it observed the moment it happened (an
+ * operator's answer to `ask_user_question`, operator-answers.ts), which is not a pass and must not be read as one.
+ */
+export type Source = "remember" | "diff" | "pass" | "code";
 
-/** Provenance every accepted write carries; `pass` = mechanical, written by the pass itself. */
+/** Provenance every accepted write carries; see `Source` for what each value means. */
 export interface Provenance {
   source: Source;
   span: number;
   at: string;
-  /** "C3" | "E1" | "u12" */
+  /** "C3" | "E1" | "u12" | "q3" */
   evidence?: string;
 }
 
@@ -107,7 +112,7 @@ export interface Caps {
  */
 export const CORRECTIONS_CEILING = 64;
 
-export const DEFAULT_CAPS: Caps = { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 10, deadEnds: 10, itemChars: 1024, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 };
+export const DEFAULT_CAPS: Caps = { hardChars: 13500, objectiveQuoteChars: 600, corrections: 0, correctionChars: 300, decisions: 20, deadEnds: 10, itemChars: 1024, workLogLines: 12, openErrors: 5, worldChars: 1200, filesChars: 2500, learnedChars: 1500 };
 
 export const MIN_QUOTE_CHARS = 12;
 
@@ -131,11 +136,17 @@ export function newerStateFormat(value: unknown): number | undefined {
 export const EVENT_ENTRY_TYPE = "compaction-state.event";
 export const SPAN_ENTRY_TYPE = "compaction-state.span";
 
+/**
+ * What a refusal says. `proposed` is the model's own text for the field, carried so a debug log can show WHAT was
+ * refused rather than only which message it was compared with: without it, "not-substring" cannot be told apart from
+ * "paraphrased the goal" or "cited the wrong turn", which is the question every evidence sweep asks first. The log
+ * keeps it out unless `PI_COMPACT_STATE_DEBUG_EXCERPTS=1` (log-safe.ts), like every other piece of the conversation.
+ */
 export type Rejection =
-  | { code: "unknown-ref"; ref: string; known: string[] }
+  | { code: "unknown-ref"; ref: string; known: string[]; proposed?: string }
   | { code: "not-user-message"; ref: string }
-  | { code: "not-substring"; ref: string; excerpt: string; closest?: string; recent: Array<{ ordinal: string; excerpt: string }> }
-  | { code: "too-long"; max: number; actual: number }
+  | { code: "not-substring"; ref: string; excerpt: string; closest?: string; recent: Array<{ ordinal: string; excerpt: string }>; proposed?: string }
+  | { code: "too-long"; max: number; actual: number; proposed?: string }
   | { code: "empty" }
   | { code: "near-duplicate"; earlierId: string; overlap: number }
   | { code: "unknown-target"; target: string; known: string[] }
@@ -150,7 +161,7 @@ export type Rejection =
   | { code: "unknown-evidence"; evidence: string }
   | { code: "remember-cap"; cap: number }
   | { code: "unlabelled"; refs: string[] }
-  | { code: "value-not-in-turn"; ref: string; value: string }
+  | { code: "value-not-in-turn"; ref: string; value: string; proposed?: string }
   | { code: "value-rejected"; ref: string; reason: "credential" | "random" | "shape" | "name" }
   | { code: "bad-label"; ref: string; detail: string }
   | { code: "schema"; detail: string }
@@ -247,7 +258,7 @@ const isCount = (value: unknown): value is number => Number.isSafeInteger(value)
 /** Shape check for replayed entries: a malformed one is skipped and counted by the fold, never thrown. */
 export function isStateEvent(value: unknown): value is StateEvent {
   if (!isRec(value)) return false;
-  const provenanceOk = (value.source === "remember" || value.source === "diff" || value.source === "pass") && isCount(value.span) && typeof value.at === "string" && isCount(value.seq);
+  const provenanceOk = (value.source === "remember" || value.source === "diff" || value.source === "pass" || value.source === "code") && isCount(value.span) && typeof value.at === "string" && isCount(value.seq);
   return provenanceOk && isEventBody(value);
 }
 

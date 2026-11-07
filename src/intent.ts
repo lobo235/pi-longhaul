@@ -12,6 +12,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
+import { scrubCredentials } from "./credential-scrub.ts";
 import { MIN_QUOTE_CHARS, type Quote, type Rejection } from "./store/events.ts";
 import { answersInBranch, answerLookupText, type OperatorAnswer } from "./operator-answers.ts";
 import type { QuoteChecker } from "./store/log.ts";
@@ -55,6 +56,16 @@ export function userText(message: AgentMessage): string {
   if (typeof message.content === "string") return message.content;
   if (!Array.isArray(message.content)) return "";
   return message.content.filter((block): block is { type: "text"; text: string } => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("\n");
+}
+
+/**
+ * The model's own words for a refused field, bounded and scrubbed: what a debug log shows so a refusal can be read as
+ * "paraphrased" or "cited the wrong turn" rather than guessed at (log-safe.ts keeps it out of a normal log).
+ */
+export const PROPOSED_CHARS = 200;
+export function proposedText(text: string): string {
+  const flat = normalizeWs(scrubCredentials(text).text);
+  return flat.length > PROPOSED_CHARS ? `${flat.slice(0, PROPOSED_CHARS - 1)}…` : flat;
 }
 
 export function normalizeWs(text: string): string {
@@ -310,7 +321,7 @@ function quoteChecks(messages: IndexedUserMessage[], byOrdinal: ReadonlyMap<stri
   const notSubstring = (ref: string, candidates: IndexedUserMessage[], wanted: string): QuoteResolution => {
     const first = candidates[0];
     const closest = candidates.map((candidate) => closestWindow(quotableText(candidate.text), wanted)).find((window) => window !== undefined);
-    const rejection: Extract<Rejection, { code: "not-substring" }> = { code: "not-substring", ref, excerpt: first ? excerpt(first.text) : "", closest, recent: recent(RECENT_SHOWN) };
+    const rejection: Extract<Rejection, { code: "not-substring" }> = { code: "not-substring", ref, excerpt: first ? excerpt(first.text) : "", closest, recent: recent(RECENT_SHOWN), proposed: proposedText(wanted) };
     return { ok: false, rejection };
   };
 
@@ -337,7 +348,7 @@ function quoteChecks(messages: IndexedUserMessage[], byOrdinal: ReadonlyMap<stri
     const hit = newestHolding(wanted);
     if (hit) return bound(hit, wanted);
     if (ref === undefined) return notSubstring("any user message", [...messages].reverse(), wanted);
-    if (!cited) return { ok: false, rejection: { code: "unknown-ref", ref, known: known() } };
+    if (!cited) return { ok: false, rejection: { code: "unknown-ref", ref, known: known(), proposed: proposedText(wanted) } };
     return notSubstring(ref, [cited], wanted);
   };
 

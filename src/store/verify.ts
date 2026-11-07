@@ -8,6 +8,7 @@
  */
 import { ownRuleOf, withoutReplacedWords } from "./lift-replacement.ts";
 import { liftNamesRule } from "./lift-words.ts";
+import { oneLine } from "../one-line.ts";
 import type { Caps, Now, Provenance, Quote, Rejection, StateEvent } from "./events.ts";
 import { findNearDuplicate } from "./near-duplicate.ts";
 import { activeCorrections, activeDeadEnds, activeDecisions, applyEvent, liftTarget, type SessionState } from "./project.ts";
@@ -51,7 +52,7 @@ const reject = (rejection: Rejection): Verdict => ({ ok: false, rejection });
 function checkText(text: string, max: number): Rejection | undefined {
   const trimmed = text.trim();
   if (trimmed.length === 0) return { code: "empty" };
-  if (trimmed.length > max) return { code: "too-long", max, actual: trimmed.length };
+  if (trimmed.length > max) return { code: "too-long", max, actual: trimmed.length, proposed: oneLine(trimmed).slice(0, 200) };
   return undefined;
 }
 

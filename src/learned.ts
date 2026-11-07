@@ -246,12 +246,23 @@ export function carryLearnedValues(previous: LearnedValue[], current: LearnedVal
 /**
  * The `## Learned values` section: one value per line with its source, newest use first, cut as a newest-first
  * prefix under `budgetChars` (every line costs its length plus a newline). A zero budget turns the section off.
+ *
+ * Named values come first and unnamed ones are capped at UNNAMED_LEARNED_SHOWN. A code-derived value carries no name --
+ * "- 8d4fbb6 (C2526)" is a pointer to a command, not a fact the reader can use -- and they crowd out the few lines that
+ * do mean something: 45 of 49 lines in one real state were unnamed, 1,400 of the section's 1,500 characters. The cap
+ * keeps the useful part of them (a hash the session just reused) without letting them own the budget.
  */
+export const UNNAMED_LEARNED_SHOWN = 10;
+
 export function renderLearnedSection(values: LearnedValue[], budgetChars: number): string[] {
   if (budgetChars <= 0) return [];
-  const lines = values
+  const prepared = values
     .map((learned) => ({ name: learned.name ? cut(oneLine(learned.name), NAME_CHARS) : "", value: oneLine(learned.value), source: cut(oneLine(learned.source), SOURCE_CHARS) }))
-    .filter((learned) => learned.value && learned.value.length <= VALUE_CHARS)
+    .filter((learned) => learned.value && learned.value.length <= VALUE_CHARS);
+  let unnamed = 0;
+  const lines = prepared
+    .filter((learned) => learned.name || ++unnamed <= UNNAMED_LEARNED_SHOWN)
+    .sort((a, b) => Number(b.name.length > 0) - Number(a.name.length > 0))
     .map((learned) => `- ${learned.value} (${learned.source}${learned.name ? `; ${learned.name}` : ""})`);
   const kept: string[] = [];
   let used = 0;
@@ -260,7 +271,7 @@ export function renderLearnedSection(values: LearnedValue[], budgetChars: number
     kept.push(line);
     used += line.length + 1;
   }
-  const omitted = lines.length - kept.length;
+  const omitted = prepared.length - kept.length;
   const heading = `## Learned values (verbatim; where each came from, then any label the summarizer gave it; newest first${omitted ? `; ${omitted} more not shown` : ""})`;
   return [heading, ...(kept.length ? kept : lines.length ? [] : ["(none recorded)"])];
 }

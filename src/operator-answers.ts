@@ -138,9 +138,9 @@ export function answerDecisionText(answer: AnsweredQuestion): string {
 }
 
 /**
- * The `decision.add` events that record a batch of answers, through the store's own gate: the mechanical hand
- * (`source: "pass"`, as the pass writes the events it derived itself), so the model's per-span remember budget is not
- * spent on answers it never asked to record.
+ * The `decision.add` events that record a batch of answers, through the store's own gate. Provenance is `code` (not
+ * `pass`): an answer is observed the moment it lands, at a tool result, not by a pass. So the model's per-span remember
+ * budget is not spent on answers it never asked to record, and a reader of the log can tell the two apart.
  *
  * Near-duplicate detection runs at 1 (identical text only) rather than the configured threshold. Two answers to two
  * similar-sounding questions are two separate decisions -- "Yes (Recommended)" settles different things under different
@@ -151,7 +151,7 @@ export function answerEvents(answers: readonly AnsweredQuestion[], deps: { state
   if (answers.length === 0) return [];
   const proposals: Proposal[] = answers.map((answer) => ({ kind: "decision", text: answerDecisionText(answer) }));
   return applyProposals(proposals, {
-    resolver: deps.resolver, state: deps.state, provenance: { source: "pass", span: deps.span, at: deps.at }, caps: deps.caps,
+    resolver: deps.resolver, state: deps.state, provenance: { source: "code", span: deps.span, at: deps.at }, caps: deps.caps,
     nearDuplicateThreshold: 1, acceptedThisSpan: 0, rememberCap: 0,
   }).events;
 }

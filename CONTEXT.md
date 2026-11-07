@@ -19,6 +19,29 @@ _Avoid_: summary, memory
 **Span**:
 The stretch of conversation between two compactions. Each compaction closes one span.
 
+**Decision**:
+One thing settled during the session, in one sentence, with the evidence it rests on: a choice, and why. It is never
+the user's words (that is a **Correction**), and it is not a withdrawal (**Dead end**). Written by the model's **Diff**,
+or by code when it observes a decision being made (**Operator answer**).
+_Avoid_: choice, conclusion, agreement
+
+**Dead end**:
+An approach that was tried and dropped, in one sentence, with the evidence it rests on: what was tried and what made
+it fail. Kept so a later attempt does not repeat it.
+_Avoid_: failure, mistake
+
+**Operator answer**:
+The operator's choice at a fork the session put to them through `ask_user_question`: the option they picked, or the
+words they typed. Code records it as a **Decision** the moment it lands, numbered `q1`, `q2`, ... so a decision can cite
+it as evidence.
+_Avoid_: user message (an answer arrives as a tool result, so it is never a quotable message); correction (an answer
+states no standing rule; a rule the operator types there is carried by a decision)
+
+**Work log**:
+One line per closed **Span**, newest last: what that span did, cut short, the detail left to `longhaul_recall`. It is
+what "do not redo work this shows done" is read from, so it is never retired to empty.
+_Avoid_: history, timeline, changelog
+
 **Pass**:
 What Longhaul does at one compaction: record the facts, fold the state so far, ask for the **Diff**, verify
 it, and close the span.

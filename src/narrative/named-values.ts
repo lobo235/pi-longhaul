@@ -10,6 +10,7 @@
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
+import { proposedText } from "../intent.ts";
 import { secretStoreOutputs, splitCredentialLines } from "../learned-secrets.ts";
 import { isNamedValueShape, isValueName, stringsIn, TRUSTED_TOOLS, VALUE_CHARS, type LearnedValue } from "../learned.ts";
 import type { FieldError } from "./validate.ts";
@@ -172,7 +173,7 @@ function checkAt(answer: NamedValueAnswer, span: SpanTexts): Verdict {
   const lines = splitCredentialLines(text);
   const onCredentialLine = lines.credential.some((line) => flat(line).includes(flat(value)));
   if (onCredentialLine || isTainted(value, span.tainted) || splitCredentialLines(`${name}: ${value}`).credential.length) return rejected(answer.ref, "credential");
-  if (!flat(lines.clean.join("\n")).includes(flat(value))) return { ok: false, error: { rejection: { code: "value-not-in-turn", ref: answer.ref, value: value.slice(0, 40) }, fixable: true } };
+  if (!flat(lines.clean.join("\n")).includes(flat(value))) return { ok: false, error: { rejection: { code: "value-not-in-turn", ref: answer.ref, value: value.slice(0, 40), proposed: proposedText(value) }, fixable: true } };
   return { ok: true, value: { name, value, source: answer.ref } };
 }
 
