@@ -124,17 +124,20 @@ export function answerLookupText(answer: OperatorAnswer | undefined): string | u
 
 /**
  * One decision text for an answer: the choice, enough of the question to make it mean something on its own, and the
- * operator's notes when they left any. Scrubbed like every model-written item (security.md T3), and cut to
- * ANSWER_ITEM_CHARS so an auto-recorded decision can never crowd the state the way a pasted answer would.
+ * operator's notes when they left any. Scrubbed like every model-written item (security.md T3) -- against the span's
+ * credential set as well as the name-shaped rules, because an operator pasting a secret into a free-text answer and a
+ * secret the conversation already showed are the same problem, and the answer is written by code, so no pass will
+ * scrub it later. Cut to ANSWER_ITEM_CHARS so an auto-recorded decision can never crowd the state the way a pasted
+ * answer would.
  */
-export function answerDecisionText(answer: AnsweredQuestion): string {
+export function answerDecisionText(answer: AnsweredQuestion, credentials?: ReadonlySet<string>): string {
   const chosen = cut(answer.answer, ANSWER_CHARS);
   const question = cut(answer.question, ANSWER_QUESTION_CHARS);
   const verb = answer.kind === "custom" ? "answered" : "chose";
   const link = answer.kind === "custom" ? "to" : "for";
   const body = `${chosen.length > 0 ? `Operator ${verb} "${chosen}"` : "Operator answered"} ${link}: ${question.length > 0 ? question : "(question not recorded)"}`;
   const withNotes = answer.notes ? `${body}. Notes: ${cut(answer.notes, ANSWER_NOTES_CHARS)}` : body;
-  return cut(scrubCredentials(withNotes).text, ANSWER_ITEM_CHARS);
+  return cut(scrubCredentials(withNotes, credentials).text, ANSWER_ITEM_CHARS);
 }
 
 /**
@@ -147,9 +150,9 @@ export function answerDecisionText(answer: AnsweredQuestion): string {
  * questions, and the composed text carries each question -- so fuzzy overlap must not quietly drop the second one. The
  * same question answered the same way twice is text-identical and still lands once.
  */
-export function answerEvents(answers: readonly AnsweredQuestion[], deps: { state: SessionState; resolver: QuoteResolver; caps: Caps; span: number; at: string }): StateEvent[] {
+export function answerEvents(answers: readonly AnsweredQuestion[], deps: { state: SessionState; resolver: QuoteResolver; caps: Caps; span: number; at: string; credentials?: ReadonlySet<string> }): StateEvent[] {
   if (answers.length === 0) return [];
-  const proposals: Proposal[] = answers.map((answer) => ({ kind: "decision", text: answerDecisionText(answer) }));
+  const proposals: Proposal[] = answers.map((answer) => ({ kind: "decision", text: answerDecisionText(answer, deps.credentials) }));
   return applyProposals(proposals, {
     resolver: deps.resolver, state: deps.state, provenance: { source: "code", span: deps.span, at: deps.at }, caps: deps.caps,
     nearDuplicateThreshold: 1, acceptedThisSpan: 0, rememberCap: 0,

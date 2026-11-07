@@ -94,6 +94,13 @@ test("answerDecisionText: a credential value in an answer is scrubbed rather tha
   assert.match(text, /export DB_PASSWORD=<redacted> first/);
 });
 
+test("answerDecisionText: a secret the span showed is scrubbed even when the answer does not name it as one", () => {
+  // No credential word and no name-shaped key: only the span's own set can catch this (the T3 rule answerEvents now honours).
+  const typed = { ...TYPED, questionIndex: 0, answer: "the one ending 7f3q9w" };
+  assert.equal(answerDecisionText(typed).includes("7f3q9w"), true, "without the span set nothing catches it");
+  assert.equal(answerDecisionText(typed, new Set(["7f3q9w"])).includes("7f3q9w"), false, "with it, the value is gone");
+});
+
 test("answerEvents: each answer becomes one decision through the mechanical hand, numbered from the state", () => {
   const branch = chain([userEntry("u1", "go ahead"), toolResultEntry("t1", "c1", ASK_TOOL, "answered", false, details([OPTION, TYPED]))]);
   const index = buildMessageIndex(branch, { commandIds: new Set(), errorIds: new Set() });

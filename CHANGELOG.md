@@ -23,7 +23,11 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 - `caps.decisions` is 20, was 10. A fork-heavy span can settle eight questions in a row, and with ten slots those
   answers pushed out the decisions the agent wrote in the same span. The 13,500-character hard cap still bounds the
-  render, so the count is a tidy-up limit rather than the binding one.
+  render, so the count is a tidy-up limit rather than the binding one. Note what that means with the answer capture on:
+  code alone can now place up to ~8.8k characters of decision text (20 slots x the 440-character answer item) into a
+  13,500-character state without the agent or the operator acting at that moment, so a burst of answers can retire the
+  older decisions and, past 20, the oldest answers. That is the state's standing rule -- oldest first, each still
+  recallable by id -- but it is now reachable in one span rather than over several.
 - The `## Learned values` section leads with the values the summarizer named and shows at most the newest ten unnamed
   ones (`UNNAMED_LEARNED_SHOWN`); it said `N more not shown` before. In one real state, 45 of 49 lines were unnamed
   code-derived pointers (`- 8d4fbb6 (C2526)`) and spent 1,400 of the section's 1,500 characters, while the four named

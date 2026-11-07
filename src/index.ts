@@ -30,6 +30,8 @@ import { foreignCompactionNotice, localOnlyRootsNotice, smallWindowNotice } from
 import { requestRunningTasks } from "./tasks.ts";
 import { EVENT_ENTRY_TYPE, SPAN_ENTRY_TYPE, STATE_FORMAT } from "./store/events.ts";
 import { answersFromDetails, answerEvents, ASK_TOOL } from "./operator-answers.ts";
+import { messagesInContext } from "./tool-context.ts";
+import { spanCredentials } from "./span-credentials.ts";
 import { project } from "./store/project.ts";
 import { buildToolContext } from "./tool-context.ts";
 
@@ -144,7 +146,8 @@ function captureAnswers(rt: Runtime, details: unknown, ctx: ExtensionContext): v
   if (answers.length === 0) return;
   const config = resolveStateConfig(readConfigFile);
   const context = buildToolContext(ctx.sessionManager.getBranch());
-  const events = answerEvents(answers, { state: project(context.log, config.caps), resolver: context.index, caps: config.caps, span: context.log.openSpan, at: new Date().toISOString() });
+  const credentials = spanCredentials(messagesInContext(ctx.sessionManager.getBranch()));
+  const events = answerEvents(answers, { state: project(context.log, config.caps), resolver: context.index, caps: config.caps, span: context.log.openSpan, at: new Date().toISOString(), credentials });
   for (const event of events) rt.pi.appendEntry(EVENT_ENTRY_TYPE, { ...event, stateFormat: STATE_FORMAT });
 }
 
