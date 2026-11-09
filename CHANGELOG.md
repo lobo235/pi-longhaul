@@ -8,6 +8,8 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-11-09
+
 ### Added
 
 - pi 1.5.0 is a verified release line (`pi-compat.json`), so a session on it runs without the unverified notice. The
