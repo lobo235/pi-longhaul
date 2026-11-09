@@ -102,6 +102,16 @@
         "npm run smoke and npm run cross-version -- --extra 1.3.0: every listed pi continues 1.3.0's transcripts and it continues theirs",
         "one real compaction through pi --mode rpc on the setup-check fixture with a local model: a compaction record, no fallback"
       ]
+    },
+    {
+      "pi": "1.5.0",
+      "date": "2026-11-09",
+      "how": [
+        "npm test on the vendored pi 1.5.0: typecheck, 1028-test suite, load smoke and the extension-API contract checks; one contract moved in a test fixture only (EntryRenderOptions gained required keyText/keyHint)",
+        "npm run smoke: one real compaction by pi 1.5.0 of the packed package in a fresh agent dir, against a fake model; the diff was accepted",
+        "npm run cross-version -- --extra 1.5.0: 13 listed pi versions continue 1.5.0's transcripts and it continues theirs (130 model requests, no anomaly)",
+        "one real compaction by pi 1.5.0 in a fresh agent dir with -ne -e <checkout>: a compaction record with an accepted diff (3 accepted, 0 dropped), not a fallback"
+      ]
     }
   ]
 }

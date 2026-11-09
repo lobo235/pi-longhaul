@@ -73,17 +73,19 @@ test("readCompactionLine: transcript text cannot reach the terminal as control s
 const DIM = "\u001b[2m";
 const theme = { fg: (color: string, text: string) => (color === "dim" ? `${DIM}${text}\u001b[22m` : text) } as unknown as Parameters<typeof renderCompactionLine>[2];
 const entry = (data: unknown) => ({ type: "custom", customType: LINE_ENTRY_TYPE, data, id: "e1", parentId: "c1", timestamp: "2026-10-07T12:00:00Z" }) as unknown as Parameters<typeof renderCompactionLine>[0];
+// pi 1.5.0 made EntryRenderOptions carry keyText/keyHint, which the line does not draw: a plain stand-in keeps the type honest.
+const options = (expanded: boolean) => ({ expanded, keyText: (id: string) => id, keyHint: (id: string, description: string) => `${id} ${description}` });
 
 test("renderCompactionLine: draws the line dimmed, collapsed or expanded, within the terminal width", () => {
-  const collapsed = renderCompactionLine(entry(ran), { expanded: false }, theme)!.render(120).map((row) => row.trimEnd());
+  const collapsed = renderCompactionLine(entry(ran), options(false), theme)!.render(120).map((row) => row.trimEnd());
   assert.ok(collapsed.some((row) => row.includes(`${DIM}longhaul: compacted in 41.2 s`)), collapsed.join("\n"));
-  const expanded = renderCompactionLine(entry(ran), { expanded: true }, theme)!.render(120).join("\n");
+  const expanded = renderCompactionLine(entry(ran), options(true), theme)!.render(120).join("\n");
   assert.match(expanded, /to a 38,410-character state/);
-  for (const row of renderCompactionLine(entry(fellBack), { expanded: true }, theme)!.render(30)) assert.ok(visibleWidth(row) <= 30, row);
+  for (const row of renderCompactionLine(entry(fellBack), options(true), theme)!.render(30)) assert.ok(visibleWidth(row) <= 30, row);
 });
 
 test("renderCompactionLine: an entry this version cannot read draws nothing", () => {
-  assert.equal(renderCompactionLine(entry({ v: 9 }), { expanded: false }, theme), undefined);
+  assert.equal(renderCompactionLine(entry({ v: 9 }), options(false), theme), undefined);
 });
 
 const common = { durationMs: 1234.6, tokensBefore: 5000, summaryChars: 900 };

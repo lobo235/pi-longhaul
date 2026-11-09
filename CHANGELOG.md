@@ -8,6 +8,21 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+### Added
+
+- pi 1.5.0 is a verified release line (`pi-compat.json`), so a session on it runs without the unverified notice. The
+  jump from 1.3.0 needed one change: pi 1.5.0 makes `EntryRenderOptions` extend `KeybindingHints`, so `keyText` and
+  `keyHint` are required — the entry renderer never read them, but the fixtures that build the options did.
+- The load-time pi registrations (`registerEntryRenderer`, `registerTool`) and the pi internals this extension calls
+  are feature-detected (`src/pi-guard.ts`): a pi that moves one warns once, naming it, and that one feature is off
+  instead of the extension failing to load. The warnings ride the existing unverified-pi notice, so a session hears
+  about a moved internal on the same `session_start` pass. The pass itself already falls back to pi's own compaction,
+  which is why this is narrower than in the smaller extensions: the hooks were never able to take a session down.
+
+### Changed
+
+- The vendored `@earendil-works/pi-coding-agent` moves from 1.3.0 to 1.5.0, so `npm test` runs against the pi in use.
+
 ## [v1.2.0] - 2026-11-07
 
 ### Added
