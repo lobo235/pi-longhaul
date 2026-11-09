@@ -19,6 +19,7 @@ import { createRouteHealth, type RouteHealthState } from "./narrative/route-heal
 import { resolveStateConfig, warmModeNotice, type StateConfig } from "./config.ts";
 import { readConfigFile, runStatePass, type PendingSpan } from "./pass.ts";
 import { piVersionStatus, readPiCompat, unverifiedPiVersionNotice } from "./pi-compat.ts";
+import { api, createWarner } from "./pi-guard.ts";
 import { registerRecallTool } from "./recall-tool.ts";
 import { registerRememberTool } from "./remember-tool.ts";
 import { registerReportCommand } from "./report-command.ts";
@@ -87,6 +88,9 @@ function warnUnusableRoots(rt: Runtime, ctx: Notify, config: StateConfig): void 
 }
 
 /** `piVersion` is for tests: pi passes only `pi`, and the running pi is the one Longhaul is checked against. */
+/** Warnings raised before a session context exists to notify through; flushed by onSessionStart. */
+const pendingWarnings: Array<[string, "info" | "warning" | "error"]> = [];
+
 export default function compactionStateExtension(pi: ExtensionAPI, options?: { piVersion?: string } | null) {
   const piVersion = options?.piVersion ?? PI_VERSION;
   // The marker a compactor that defers to Longhaul reads (select.ts): set at LOAD, which is earlier
@@ -102,7 +106,17 @@ export default function compactionStateExtension(pi: ExtensionAPI, options?: { p
   if (loadLogPath === loadDefaultLog) privateLogDir(path.dirname(loadDefaultLog));
   if (loadLogPath) appendJsonl(loadLogPath, { event: "extension-loaded", piVersion, piVersionVerified: piStatus === "exact" ? true : piStatus === "line" ? "line" : false });
   registerReportCommand(pi, piStatus);
-  pi.registerEntryRenderer(LINE_ENTRY_TYPE, renderCompactionLine);
+  // Load-time registrations are feature-detected: a pi that moved one of these would otherwise abort the whole
+  // extension before any handler could speak (ADR 0009). A missing registrar is announced once and skipped.
+  const guard = createWarner((message, level) => pendingWarnings.push([message, level ?? "warning"]));
+  const register = (name: "registerEntryRenderer" | "registerTool", registrar: unknown, ...args: unknown[]): void => {
+    if (typeof registrar === "function") {
+      (registrar as (...a: unknown[]) => void).apply(pi, args);
+      return;
+    }
+    api(guard, `pi.${name}`, undefined as unknown, undefined);
+  };
+  register("registerEntryRenderer", pi.registerEntryRenderer, LINE_ENTRY_TYPE, renderCompactionLine);
 
   const rt: Runtime = { pi, warned: new Set(), routeHealth: createRouteHealth(), piVersionNotice: unverifiedPiVersionNotice(piVersion, piCompat) ?? undefined };
   pi.on("session_start", async (_event, ctx) => onSessionStart(rt, ctx));
@@ -128,8 +142,12 @@ export default function compactionStateExtension(pi: ExtensionAPI, options?: { p
 
   // Registered in every session (not only a state-selected one): a stood-down session can still
   // remember, and its writes ride the branch until the next state pass folds them in.
-  registerRememberTool(pi);
-  registerRecallTool(pi);
+  if (typeof (pi as unknown as { registerTool?: unknown }).registerTool === "function") {
+    registerRememberTool(pi);
+    registerRecallTool(pi);
+  } else {
+    api(guard, "pi.registerTool", undefined as unknown, undefined);
+  }
 
   pi.on("session_before_compact", async (event, ctx) => beforeCompact(rt, event, ctx));
   pi.on("session_compact", async (event, ctx) => afterCompact(rt, event, ctx));
@@ -157,6 +175,9 @@ function onSessionStart(rt: Runtime, ctx: ExtensionContext): void {
   process.env[STATE_LOADED_ENV] = stateLoadedMarker();
   // The notice is about compactions Longhaul makes, so a session that opted out of them is not told.
   if (standsDown()) return;
+  // Anything the load found missing (a moved registrar, an absent pi internal) is said once, here, where there is a
+  // context to say it through. They are the same warnings the version notice is: pi moved, this degraded, it still runs.
+  for (const [message, level] of pendingWarnings.splice(0)) ctx.ui.notify?.(message, level);
   if (rt.piVersionNotice) ctx.ui.notify?.(rt.piVersionNotice, "warning");
   const config = resolveStateConfig(readConfigFile);
   rt.keptWindowThinking = config.keptWindowThinking;
