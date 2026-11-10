@@ -8,6 +8,16 @@ entries and log event types. Rendered state text, prompt wording and section lay
 
 ## [Unreleased]
 
+## [v1.3.1] - 2026-11-10
+
+### Changed
+
+- pi **1.5.2** is a verified patch on the listed 1.5 line and is now recorded exactly in
+  `pi-compat.json`. No extension contract moved: `npm test` (1028 tests), `npm run smoke`,
+  `npm run cross-version -- --extra 1.5.2` (15 pi versions, 150 model requests) and one live
+  compaction under 1.5.2 are green. The vendored `@earendil-works/pi-coding-agent` moves
+  1.5.1 → 1.5.2.
+
 ## [v1.3.0] - 2026-11-09
 
 ### Added
