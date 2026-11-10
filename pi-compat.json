@@ -112,6 +112,15 @@
         "npm run cross-version -- --extra 1.5.0: 13 listed pi versions continue 1.5.0's transcripts and it continues theirs (130 model requests, no anomaly)",
         "one real compaction by pi 1.5.0 in a fresh agent dir with -ne -e <checkout>: a compaction record with an accepted diff (3 accepted, 0 dropped), not a fallback"
       ]
+    },
+    {
+      "pi": "1.5.1",
+      "date": "2026-11-10",
+      "how": [
+        "npm test on the vendored pi: typecheck, unit suite, load smoke, extension-API contract checks — all green",
+        "npm run smoke: one compaction by 1.5.1 against a fake model",
+        "npm run cross-version -- --extra 1.5.1: it continues transcripts every listed pi wrote and they continue its"
+      ]
     }
   ]
 }
