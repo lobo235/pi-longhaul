@@ -121,6 +121,16 @@
         "npm run smoke: one compaction by 1.5.1 against a fake model",
         "npm run cross-version -- --extra 1.5.1: it continues transcripts every listed pi wrote and they continue its"
       ]
+    },
+    {
+      "pi": "1.5.2",
+      "date": "2026-11-10",
+      "how": [
+        "npm test on the vendored 1.5.2: typecheck, unit suite (1028 tests), load smoke and the extension-API contract checks",
+        "npm run smoke: one real compaction by 1.5.2 against a fake model; the diff was accepted",
+        "npm run cross-version -- --extra 1.5.2: it continued transcripts every listed pi wrote and they continued its (15 versions, 150 model requests)",
+        "one real compaction on a synthetic RPC session under 1.5.2 (pi -ne -e <checkout>): the log shows event=compaction then event=compacted with fromExtension=true"
+      ]
     }
   ]
 }
