@@ -131,6 +131,14 @@
         "npm run cross-version -- --extra 1.5.2: it continued transcripts every listed pi wrote and they continued its (15 versions, 150 model requests)",
         "one real compaction on a synthetic RPC session under 1.5.2 (pi -ne -e <checkout>): the log shows event=compaction then event=compacted with fromExtension=true"
       ]
+    },
+    {
+      "pi": "1.6.1",
+      "date": "2026-11-25",
+      "how": [
+        "npm test on the vendored pi (the version gate skipped): typecheck, unit suite, load smoke and the extension-API contract checks",
+        "npm run smoke: one real compaction by that pi in a fresh agent dir, against a fake model; the diff was accepted"
+      ]
     }
   ]
 }
